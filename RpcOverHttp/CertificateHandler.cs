@@ -48,7 +48,7 @@ namespace RpcOverHttp
                         KeyBitLength = 4096,
                         Name = new X500DistinguishedName(string.Format("CN=\"{0}\"; C=\"{0}\"; O=\"{0}\"; OU=\"{0}\";", name)),
                         ValidFrom = DateTime.Today,
-                        ValidTo = DateTime.Today.AddYears(10)
+                        ValidTo = DateTime.Today.AddYears(10),
                     });
                 //ensure pfx in cert.
                 byte[] pfx = cert.Export(X509ContentType.Pfx);

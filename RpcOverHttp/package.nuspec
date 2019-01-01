@@ -4,7 +4,7 @@
     <!--*-->
     <id>RpcOverHttp</id>
     <!--*-->
-    <version>3.0.0</version>
+    <version>3.1.0</version>
     <title>RpcOverHttp</title>
     <!--*-->
     <authors>tiny</authors>
@@ -23,8 +23,7 @@ add support for using Stream as argument or return type
 add support for using AuthroizeAttribute, IExceptionHandler and IAuthorizeHandler like asp.net mvc projects.
 add support for custom request or response data serializer to override the built-in defaults.</releaseNotes>
     <copyright>Copyright ©  2017 tiny@sandsea.info</copyright>
-    <tags>
-    </tags>
+    <tags>rpc,ipc,http</tags>
     <dependencies>
       <!--
       <dependency id="SampleDependency" version="1.0" />
