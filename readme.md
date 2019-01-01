@@ -155,10 +155,10 @@ static void Main(string[] args)
 ### advanced or what i remembered.
 
 - like asp.net mvc. using AuthorizeAttribute/AllowAnonymousAttribute to control your rpc service access
-- using Task/Task<T> as the return type to do async stuff.
+- using Task/Task&lt;T&gt; as the return type to do async stuff.
 - default data serializer is a built-in protobuf serializer(ProtoBufRpcDataSerializer),to override the defaults, define your own serializer and register it by using the ioc registration method both in server and client, you should hand the stream type carefully when serialize/deserialize in your own implementation.
 - built-in a implementation of IExceptionHandler so do IAuthorizeHandler,you can define your own implementation and register it by using the ioc registration method in server to override the defaults
-- ummm... the client request timeout is 120s. so do the Task/Task<T> waiting timeout at the server side.
+- ummm... the client request timeout is 120s. so do the Task/Task&lt;T&gt; waiting timeout at the server side.
 - the request/response is standard http request, fiddler can review the communication
 - metadata is serailized using IRpcHeadSerializer(JsonRpcHeadSerializer) as default, then adds to http header, the header name is "meta"
 - the http body both request and response is serialize/deserialize by using IRpcDataSerializer(ProtoBufRpcDataSerializer) as default
