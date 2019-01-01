@@ -152,7 +152,7 @@ static void Main(string[] args)
 
 ```
 
-### advanced or what i remembered.
+## advanced or what i have remembered.
 
 - like asp.net mvc. using AuthorizeAttribute/AllowAnonymousAttribute to control your rpc service access
 - using Task/Task&lt;T&gt; as the return type to do async stuff.
@@ -162,3 +162,13 @@ static void Main(string[] args)
 - the request/response is standard http request, fiddler can review the communication
 - metadata is serailized using IRpcHeadSerializer(JsonRpcHeadSerializer) as default, then adds to http header, the header name is "meta"
 - the http body both request and response is serialize/deserialize by using IRpcDataSerializer(ProtoBufRpcDataSerializer) as default
+
+## https?
+yes, it support https with a simple way.
+for server, if you use a https url, framework will auto generate a cert file pair(private key will install to system(LocalMachine->Personal) and the public key is exported to a cert file for client use)
+for client, find the cert exported on server and feed the initialize method as cerFilePath.
+```
+public static RpcClient Initialize(string url, string cerFilePath, WebProxy proxy = null)
+```
+to regenerate cert file pair, delete the cert from system(LocalMachine->Personal). the cert name is "RpcOverHttp"
+

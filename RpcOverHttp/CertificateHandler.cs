@@ -17,19 +17,25 @@ namespace RpcOverHttp
             ExecuteNetshCommand(command);
         }
 
-        public static bool IsServantCertificateInstalled()
+        public static bool IsServantCertificateInstalled(string name)
         {
             var certificates = GetCertificates();
-            return certificates.Any(x => x.Name == "EzHttp");
+            return certificates.Any(x => x.Name == name);
         }
 
-        public static void InstallServantCertificate()
+        public static void InstallServantCertificate(string name)
         {
-            var store = new X509Store(StoreName.My, StoreLocation.LocalMachine);
-            store.Open(OpenFlags.ReadWrite);
 
+            var store = new X509Store(StoreName.My, StoreLocation.LocalMachine);
+            try
+            {
+                store.Open(OpenFlags.ReadWrite);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Try run as administrator to access the X509Store when using https.", ex);
+            }
             //CRASH!
-            // Servant certifikatet kan ikke bindes til Azure serveren, ved mindre det bliver eksporteret og importeret først. Den siger det der med local user blablal.. 
 
             X509Certificate2 cert;
             using (var ctx = new CryptContext())
@@ -40,23 +46,23 @@ namespace RpcOverHttp
                     {
                         IsPrivateKeyExportable = true,
                         KeyBitLength = 4096,
-                        Name = new X500DistinguishedName("CN=\"EzHttp\"; C=\"EzHttp\"; O=\"EzHttp\"; OU=\"EzHttp\";"),
+                        Name = new X500DistinguishedName(string.Format("CN=\"{0}\"; C=\"{0}\"; O=\"{0}\"; OU=\"{0}\";", name)),
                         ValidFrom = DateTime.Today,
                         ValidTo = DateTime.Today.AddYears(10)
                     });
                 //ensure pfx in cert.
                 byte[] pfx = cert.Export(X509ContentType.Pfx);
                 byte[] pkbytes = cert.Export(X509ContentType.Cert);
-                System.IO.File.WriteAllBytes(".\\ezhttp.cer", pkbytes);
+                System.IO.File.WriteAllBytes(string.Format(".\\{0}.cer", name), pkbytes);
                 cert = new X509Certificate2(pfx, (string)null, X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.MachineKeySet);
             }
-            cert.FriendlyName = "EzHttp";
+            cert.FriendlyName = name;
             store.Add(cert);
             store.Close();
             System.Threading.Thread.Sleep(1000); // Wait for certificate to be installed
         }
 
-        internal static void ExportPkFile(Certificate cert)
+        internal static void ExportPkFile(Certificate cert, string name)
         {
             var store = new X509Store(StoreName.My, StoreLocation.LocalMachine);
             store.Open(OpenFlags.ReadWrite);
@@ -64,14 +70,14 @@ namespace RpcOverHttp
             if (sCert.Count == 1)
             {
                 var bytes = sCert[0].Export(X509ContentType.Cert);
-                System.IO.File.WriteAllBytes(".\\ezhttp.cer", bytes);
+                System.IO.File.WriteAllBytes(string.Format(".\\{0}.cer", name), bytes);
             }
             store.Close();
         }
 
-        public static void AddCertificateBinding(int port)
+        public static void AddCertificateBinding(string name, int port)
         {
-            var certificateHash = GetServantCertHash();
+            var certificateHash = GetServantCertHash(name);
             var command = "http add sslcert ipport=0.0.0.0:" + port + " certhash=" + certificateHash + " appid={53DD655A-24B4-4DF5-B077-C4217610472E}";
             var cmdOutput = ExecuteNetshCommand(command);
         }
@@ -83,9 +89,9 @@ namespace RpcOverHttp
             return !cmdOutput.Contains("The system cannot find the file specified.") && !cmdOutput.Contains("系统找不到指定的文件");
         }
 
-        private static string GetServantCertHash()
+        private static string GetServantCertHash(string name)
         {
-            var certificate = GetCertificates().SingleOrDefault(x => x.Name == "EzHttp");
+            var certificate = GetCertificates().SingleOrDefault(x => x.Name == name);
             if (certificate == null)
                 return null;
 

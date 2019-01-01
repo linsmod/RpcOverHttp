@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
@@ -91,8 +92,7 @@ namespace RpcOverHttp
         /// <param name="cerFilePath"></param>
         public static RpcClient Initialize(string url, string cerFilePath, WebProxy proxy = null)
         {
-            AddCertForHttps(cerFilePath);
-            return Initialize(new Uri(url), proxy);
+            return Initialize(new Uri(url), cerFilePath, proxy);
         }
 
         /// <summary>
@@ -109,34 +109,19 @@ namespace RpcOverHttp
         /// HTTP ONLY
         /// </summary>
         /// <param name="url"></param>
-        public static RpcClient Initialize(Uri url, WebProxy proxy = null, bool enableAdministration = false)
+        public static RpcClient Initialize(Uri url, string cerFilePath, WebProxy proxy = null)
         {
+            AddCertForHttps(cerFilePath);
             if (url.Scheme == ("https") && !Certs.Any())
             {
-                throw new Exception("请先添加https证书");
+                throw new Exception("you should provide a cert when using https.");
             }
-            try
-            {
-                var iocContainer = new TinyIoC.TinyIoCContainer();
-                iocContainer.Register<IRpcDataSerializer, ProtoBufRpcDataSerializer>(new ProtoBufRpcDataSerializer(), "default");
-                iocContainer.Register<IRpcHeadSerializer, JsonRpcHeadSerializer>(new JsonRpcHeadSerializer(), "default");
-                var _proxyFactory = new RpcDynamicProxyFactory(url, proxy, iocContainer);
-                var client = new RpcClient(_proxyFactory, proxy, iocContainer);
-                return client;
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("拉取接口元数据时出现错误。" + ex.Message, ex);
-            }
-        }
-        /// <summary>
-        /// HTTP ONLY
-        /// </summary>
-        /// <param name="url"></param>
-        public static RpcClient Initialize(string url, WebProxy proxy = null)
-        {
-            var uri = new Uri(url);
-            return Initialize(uri, proxy);
+            var iocContainer = new TinyIoC.TinyIoCContainer();
+            iocContainer.Register<IRpcDataSerializer, ProtoBufRpcDataSerializer>(new ProtoBufRpcDataSerializer(), "default");
+            iocContainer.Register<IRpcHeadSerializer, JsonRpcHeadSerializer>(new JsonRpcHeadSerializer(), "default");
+            var _proxyFactory = new RpcDynamicProxyFactory(url, proxy, iocContainer);
+            var client = new RpcClient(_proxyFactory, proxy, iocContainer);
+            return client;
         }
 
         internal static List<byte[]> Certs = new List<byte[]>();
@@ -147,6 +132,11 @@ namespace RpcOverHttp
             this._proxyFactory = _proxyFactory;
             this._webProxy = proxy;
             this.iocContainer = iocContainer;
+            ServicePointManager.ServerCertificateValidationCallback = RemoteCertificateValidationCallback;
+        }
+        bool RemoteCertificateValidationCallback(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
+        {
+            return Certs.Any(x => x.SequenceEqual(certificate.GetRawCertData()));
         }
 
         static void AddCertForHttps(string fileName)
@@ -163,7 +153,7 @@ namespace RpcOverHttp
             }
             catch (Exception ex)
             {
-                throw new Exception("证书读取出错，" + ex.Message);
+                throw new Exception("error to read the cert file. " + ex.Message);
             }
         }
     }

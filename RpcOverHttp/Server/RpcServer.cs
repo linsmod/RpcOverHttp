@@ -56,16 +56,17 @@ namespace RpcOverHttp
 
         private void EnsureCertBindingInstalled(int port)
         {
-            var cert = CertificateHandler.GetCertificates().FirstOrDefault(x => x.Name == "EzHttp");
+            var name = this.GetType().Assembly.GetName().Name;
+            var cert = CertificateHandler.GetCertificates().FirstOrDefault(x => x.Name == name);
             if (cert == null)
-                CertificateHandler.InstallServantCertificate();
+                CertificateHandler.InstallServantCertificate(name);
             else
             {
-                CertificateHandler.ExportPkFile(cert);
+                CertificateHandler.ExportPkFile(cert, name);
             }
             if (!CertificateHandler.IsCertificateBound(port))
             {
-                CertificateHandler.AddCertificateBinding(port);
+                CertificateHandler.AddCertificateBinding(name, port);
             }
         }
     }
