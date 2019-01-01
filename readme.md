@@ -158,15 +158,15 @@ static void Main(string[] args)
 - using Task/Task&lt;T&gt; as the return type to do async stuff.
 - default data serializer is a built-in protobuf serializer(ProtoBufRpcDataSerializer),to override the defaults, define your own serializer and register it by using the ioc registration method both in server and client, you should hand the stream type carefully when serialize/deserialize in your own implementation.
 - built-in a implementation of IExceptionHandler so do IAuthorizeHandler,you can define your own implementation and register it by using the ioc registration method in server to override the defaults
-- ummm... the client request timeout is 120s. so do the Task/Task&lt;T&gt; waiting timeout at the server side.
+- the client request timeout is 120s. so do the Task/Task&lt;T&gt; waiting timeout at the server side.
 - the request/response is standard http request, fiddler can review the communication
-- metadata is serailized using IRpcHeadSerializer(JsonRpcHeadSerializer) as default, then adds to http header, the header name is "meta"
+- requet metadata is a route info about how to find the implementation method. it will be serialized using IRpcHeadSerializer(JsonRpcHeadSerializer as default), then adds to http header, the header name is "meta"
 - the http body both request and response is serialize/deserialize by using IRpcDataSerializer(ProtoBufRpcDataSerializer) as default
 
-## https?
-yes, it support https with a simple way.
-- for server side, if you use a https url, framework will auto generate a cert file pair(private key will install to system(LocalMachine->Personal) and the public key is exported to a cert file for client use)
-- for client side, find the cert exported on server and feed the initialize method as cerFilePath.
+## https
+yes, it supports https with a simple way.
+- for server side, if you use a https url, when server starting, framework will auto generate a cert file pair(private key will install to system(LocalMachine->Personal) and the public key is exported as a cert file under working dir for client use)
+- for client side, find the exported cert file by server and feed it to the initialize method.
 ```
 public static RpcClient Initialize(string url, string cerFilePath, WebProxy proxy = null)
 ```
