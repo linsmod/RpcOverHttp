@@ -165,8 +165,8 @@ static void Main(string[] args)
 
 ## https?
 yes, it support https with a simple way.
-for server, if you use a https url, framework will auto generate a cert file pair(private key will install to system(LocalMachine->Personal) and the public key is exported to a cert file for client use)
-for client, find the cert exported on server and feed the initialize method as cerFilePath.
+- for server side, if you use a https url, framework will auto generate a cert file pair(private key will install to system(LocalMachine->Personal) and the public key is exported to a cert file for client use)
+- for client side, find the cert exported on server and feed the initialize method as cerFilePath.
 ```
 public static RpcClient Initialize(string url, string cerFilePath, WebProxy proxy = null)
 ```
