@@ -2,6 +2,7 @@
 using RpcOverHttp.Serialization;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Security;
@@ -90,7 +91,7 @@ namespace RpcOverHttp
         /// </summary>
         /// <param name="url"></param>
         /// <param name="cerFilePath"></param>
-        public static RpcClient Initialize(string url, string cerFilePath, WebProxy proxy = null)
+        public static RpcClient Initialize(string url, string cerFilePath = null, WebProxy proxy = null)
         {
             return Initialize(new Uri(url), cerFilePath, proxy);
         }
@@ -109,9 +110,14 @@ namespace RpcOverHttp
         /// HTTP ONLY
         /// </summary>
         /// <param name="url"></param>
-        public static RpcClient Initialize(Uri url, string cerFilePath, WebProxy proxy = null)
+        public static RpcClient Initialize(Uri url, string cerFilePath = null, WebProxy proxy = null)
         {
-            AddCertForHttps(cerFilePath);
+            if (!string.IsNullOrEmpty(cerFilePath))
+            {
+                if (!System.IO.File.Exists(cerFilePath))
+                    throw new Exception("the cer file you provided is not exists. " + Path.GetFileName(cerFilePath));
+                AddCertForHttps(cerFilePath);
+            }
             if (url.Scheme == ("https") && !Certs.Any())
             {
                 throw new Exception("you should provide a cert when using https.");
