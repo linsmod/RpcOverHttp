@@ -15,13 +15,13 @@ public interface IRpcServiceSample
         Task TestRemoteTask();
         Task<string> TestRemoteTaskWithResult();
         Task<string> TestRemoteAsyncTaskWithResult();
-		void UploadStream(Stream stream, string fileName);
+	void UploadStream(Stream stream, string fileName);
         Stream DownloadStream(string fileName);
     }
 
 ```
 
-### 2)implement the interface in MyImpl.dll, reference RpcOverHttp.dll
+### 2)implement the interface in MyImpl.dll, reference RpcOverHttp.dll, MyInterface.dll
 
  RpcService is only for access user info here. can be removed if do not accss User object
 
@@ -62,8 +62,8 @@ public class RpcServiceSample : RpcService, IRpcServiceSample
         {
             return await new StringReader("abc").ReadLineAsync();
         }
-
-		public void UploadStream(Stream stream, string fileName)
+	
+        public void UploadStream(Stream stream, string fileName)
         {
             var fs = File.Open(fileName, FileMode.Create);
             stream.CopyTo(fs);
@@ -154,11 +154,11 @@ static void Main(string[] args)
 
 ### advanced or what i remembered.
 
--- like asp.net mvc. using AuthorizeAttribute/AllowAnonymousAttribute to control your rpc service access
--- using Task/Task<T> as the return type to do async stuff.
--- default data serializer is a built-in protobuf serializer(ProtoBufRpcDataSerializer),to override the defaults, define your own serializer and register it by using the ioc registration method both in server and client, you should hand the stream type carefully when serialize/deserialize in your own implementation.
--- built-in a implementation of IExceptionHandler so do IAuthorizeHandler,you can define your own implementation and register it by using the ioc registration method in server to override the defaults
--- ummm... the client request timeout is 120s. so do the Task/Task<T> waiting timeout at the server side.
--- the request/response is standard http request, fiddler can review the communication
--- metadata is serailized using IRpcHeadSerializer(JsonRpcHeadSerializer) as default, then adds to http header, the header name is "meta"
--- the http body both request and response is serialize/deserialize by using IRpcDataSerializer(ProtoBufRpcDataSerializer) as default
+- like asp.net mvc. using AuthorizeAttribute/AllowAnonymousAttribute to control your rpc service access
+- using Task/Task<T> as the return type to do async stuff.
+- default data serializer is a built-in protobuf serializer(ProtoBufRpcDataSerializer),to override the defaults, define your own serializer and register it by using the ioc registration method both in server and client, you should hand the stream type carefully when serialize/deserialize in your own implementation.
+- built-in a implementation of IExceptionHandler so do IAuthorizeHandler,you can define your own implementation and register it by using the ioc registration method in server to override the defaults
+- ummm... the client request timeout is 120s. so do the Task/Task<T> waiting timeout at the server side.
+- the request/response is standard http request, fiddler can review the communication
+- metadata is serailized using IRpcHeadSerializer(JsonRpcHeadSerializer) as default, then adds to http header, the header name is "meta"
+- the http body both request and response is serialize/deserialize by using IRpcDataSerializer(ProtoBufRpcDataSerializer) as default
