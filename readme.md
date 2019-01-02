@@ -172,7 +172,7 @@ public static RpcClient Initialize(string url, string cerFilePath, WebProxy prox
 ```
 to regenerate cert file pair, delete the cert from system(LocalMachine->Personal). the cert name is "RpcOverHttp"
 
-### iis intergration since version 3.3.0
+## iis intergration since version 3.3.0
 we provided a http module for host rpc server on iis since version 3.3.0. 
 selfhost style:
 ```
