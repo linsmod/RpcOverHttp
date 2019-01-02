@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+using RpcOverHttp.WebHost;
 
 namespace RpcHost
 {
@@ -20,6 +21,17 @@ namespace RpcHost
             server.Register<IRpcServiceSample, RpcServiceSample>();
             server.Start(url);
             Console.ReadLine();
+        }
+    }
+
+    public class RpcWebHostHttpModule : RpcServerHttpModule
+    {
+        public RpcWebHostHttpModule()
+        {
+        }
+        public override void InitRpcServer(IRpcServer server)
+        {
+            server.Register<IRpcServiceSample, RpcServiceSample>();
         }
     }
 }

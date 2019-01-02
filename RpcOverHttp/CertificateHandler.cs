@@ -23,20 +23,23 @@ namespace RpcOverHttp
             return certificates.Any(x => x.Name == name);
         }
 
-        public static void InstallServantCertificate(string name)
+        private static X509Store OpenStore(OpenFlags flags = OpenFlags.ReadOnly)
         {
-
             var store = new X509Store(StoreName.My, StoreLocation.LocalMachine);
             try
             {
-                store.Open(OpenFlags.ReadWrite);
+                store.Open(flags);
+                return store;
             }
             catch (Exception ex)
             {
                 throw new Exception("Try run as administrator to access the X509Store when using https.", ex);
             }
-            //CRASH!
+        }
 
+        public static void InstallServantCertificate(string name)
+        {
+            var store = OpenStore(OpenFlags.ReadWrite);
             X509Certificate2 cert;
             using (var ctx = new CryptContext())
             {
@@ -64,8 +67,7 @@ namespace RpcOverHttp
 
         internal static void ExportPkFile(Certificate cert, string name)
         {
-            var store = new X509Store(StoreName.My, StoreLocation.LocalMachine);
-            store.Open(OpenFlags.ReadWrite);
+            var store = OpenStore();
             var sCert = store.Certificates.Find(X509FindType.FindByThumbprint, cert.Thumbprint, false);
             if (sCert.Count == 1)
             {
@@ -99,10 +101,8 @@ namespace RpcOverHttp
         }
         internal static IEnumerable<Certificate> GetCertificates()
         {
-            var store = new X509Store(StoreName.My, StoreLocation.LocalMachine);
-            store.Open(OpenFlags.OpenExistingOnly);
+            var store = OpenStore();
             var certs = store.Certificates.Cast<X509Certificate2>().ToList();
-
             foreach (var cert in certs)
             {
                 var name = cert.FriendlyName;
@@ -115,7 +115,6 @@ namespace RpcOverHttp
                         name = commonName.Substring(locationOfEquals + 1, commonName.Length - (locationOfEquals + 1));
                     }
                 }
-
                 yield return new Certificate { Name = name, Hash = cert.GetCertHash(), Thumbprint = cert.Thumbprint };
             }
         }

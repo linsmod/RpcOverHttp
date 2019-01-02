@@ -49,6 +49,7 @@
     <Reference Include="System.Management" />
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Web" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -74,9 +75,11 @@
     <Compile Include="ByteSize.cs" />
     <Compile Include="Client\RpcClient.cs" />
     <Compile Include="RpcError.cs" />
-    <Compile Include="HttpListenerContextExtension.cs" />
+    <Compile Include="HttpContextExtension.cs" />
     <Compile Include="Client\RpcDynamicProxyFactory.cs" />
+    <Compile Include="RpcHttpContext.cs" />
     <Compile Include="RpcService.cs" />
+    <Compile Include="SelfHost\SystemNetHttpContext.cs" />
     <Compile Include="Serialization\IRpcDataSerializer.cs" />
     <Compile Include="Serialization\TempFileStream.cs" />
     <Compile Include="Server\IRpcServiceAdministration.cs" />
@@ -94,6 +97,8 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TimeoutAttribute.cs" />
     <Compile Include="TinyIoC.cs" />
+    <Compile Include="WebHost\RpcServerHttpModule.cs" />
+    <Compile Include="WebHost\SystemWebHttpContext.cs" />
     <Compile Include="ZipHelper.cs" />
   </ItemGroup>
   <ItemGroup>

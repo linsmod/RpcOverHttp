@@ -34,6 +34,8 @@ namespace RpcOverHttp
             return factory.CreateDynamicProxy<TInterface>(this, token);
         }
         public Uri ApiUrl { get; set; }
+        public RemoteCertificateValidationCallback ServerCertificateValidationCallback { get; internal set; }
+
         public string GetUrl(string token)
         {
             return this.ApiUrl + "download?token=" + token;
@@ -143,7 +145,7 @@ namespace RpcOverHttp
             HttpWebRequest httprequest = WebRequest.CreateHttp(factory.ApiUrl);
             httprequest.Method = "POST";
             httprequest.KeepAlive = true;
-
+            httprequest.ServerCertificateValidationCallback = this.factory.ServerCertificateValidationCallback;
 
             IRpcHeadSerializer headSerializer;
             if (!this.factory.iocContainer.TryResolve(out headSerializer))

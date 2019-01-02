@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
-using RpcOverHttp.Serialization;
+﻿using RpcOverHttp.Serialization;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -15,7 +14,7 @@ namespace RpcOverHttp
     public class IocContainerWrapper
     {
         internal TinyIoC.TinyIoCContainer iocContainer;
-        public IocContainerWrapper(TinyIoC.TinyIoCContainer iocContainer)
+        internal IocContainerWrapper(TinyIoC.TinyIoCContainer iocContainer)
         {
             this.iocContainer = iocContainer;
         }
@@ -112,21 +111,24 @@ namespace RpcOverHttp
         /// <param name="url"></param>
         public static RpcClient Initialize(Uri url, string cerFilePath = null, WebProxy proxy = null)
         {
+            var iocContainer = new TinyIoC.TinyIoCContainer();
+            iocContainer.Register<IRpcDataSerializer, ProtoBufRpcDataSerializer>(new ProtoBufRpcDataSerializer(), "default");
+            iocContainer.Register<IRpcHeadSerializer, JsonRpcHeadSerializer>(new JsonRpcHeadSerializer(), "default");
+            
+            var _proxyFactory = new RpcDynamicProxyFactory(url, proxy, iocContainer);
+            var client = new RpcClient(_proxyFactory, proxy, iocContainer);
             if (!string.IsNullOrEmpty(cerFilePath))
             {
                 if (!System.IO.File.Exists(cerFilePath))
                     throw new Exception("the cer file you provided is not exists. " + Path.GetFileName(cerFilePath));
-                AddCertForHttps(cerFilePath);
+                client.AddCertForHttps(cerFilePath);
             }
             if (url.Scheme == ("https") && !Certs.Any())
             {
                 throw new Exception("you should provide a cert when using https.");
             }
-            var iocContainer = new TinyIoC.TinyIoCContainer();
-            iocContainer.Register<IRpcDataSerializer, ProtoBufRpcDataSerializer>(new ProtoBufRpcDataSerializer(), "default");
-            iocContainer.Register<IRpcHeadSerializer, JsonRpcHeadSerializer>(new JsonRpcHeadSerializer(), "default");
-            var _proxyFactory = new RpcDynamicProxyFactory(url, proxy, iocContainer);
-            var client = new RpcClient(_proxyFactory, proxy, iocContainer);
+            var cb = new RemoteCertificateValidationCallback(client.RemoteCertificateValidationCallback);
+            _proxyFactory.ServerCertificateValidationCallback = cb;
             return client;
         }
 
@@ -138,14 +140,26 @@ namespace RpcOverHttp
             this._proxyFactory = _proxyFactory;
             this._webProxy = proxy;
             this.iocContainer = iocContainer;
-            ServicePointManager.ServerCertificateValidationCallback = RemoteCertificateValidationCallback;
-        }
-        bool RemoteCertificateValidationCallback(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
-        {
-            return Certs.Any(x => x.SequenceEqual(certificate.GetRawCertData()));
         }
 
-        static void AddCertForHttps(string fileName)
+        public RemoteCertificateValidationCallback ServerCertificateValidationCallback { get; set; }
+        public X509Certificate ClientX509Certificate
+        {
+            get; private set;
+        }
+        internal bool RemoteCertificateValidationCallback(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
+        {
+            if (!Certs.Any(x => x.SequenceEqual(certificate.GetRawCertData())))
+            {
+                if (ServerCertificateValidationCallback != null)
+                {
+                    return ServerCertificateValidationCallback(sender, certificate, chain, sslPolicyErrors);
+                }
+            }
+            return false;
+        }
+
+        void AddCertForHttps(string fileName)
         {
             try
             {
@@ -156,6 +170,7 @@ namespace RpcOverHttp
                     return;
                 }
                 Certs.Add(pk);
+                ClientX509Certificate = cert;
             }
             catch (Exception ex)
             {

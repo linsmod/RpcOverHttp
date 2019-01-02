@@ -2,10 +2,9 @@
 using System.IO;
 using System.Security.AccessControl;
 using Microsoft.Win32.SafeHandles;
-
+#pragma warning disable CS0618 // Type or member is obsolete
 namespace RpcOverHttp.Serialization
 {
-
     public partial class ProtoBufRpcDataSerializer
     {
         public class TempFileStream : FileStream
@@ -26,7 +25,9 @@ namespace RpcOverHttp.Serialization
             {
             }
 
+
             public TempFileStream(IntPtr handle, FileAccess access, bool ownsHandle) : base(handle, access, ownsHandle)
+
             {
             }
 
@@ -81,3 +82,4 @@ namespace RpcOverHttp.Serialization
         }
     }
 }
+#pragma warning restore CS0618 // Type or member is obsolete

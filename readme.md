@@ -165,10 +165,70 @@ static void Main(string[] args)
 
 ## https
 yes, it supports https with a simple way.
-- for server side, if you use a https url, when server starting, framework will auto generate a cert file pair(private key will install to system(LocalMachine->Personal) and the public key is exported as a cert file under working dir for client use)
-- for client side, find the exported cert file by server and feed it to the initialize method.
+- at server side, if you use a https url, when server starting, framework will auto generate a cert file pair(private key will install to system(LocalMachine->Personal) and the public key is exported as a cert file under working dir for client use)
+- at client side, find the exported cert file by server and feed it to the initialize method.
 ```
 public static RpcClient Initialize(string url, string cerFilePath, WebProxy proxy = null)
 ```
 to regenerate cert file pair, delete the cert from system(LocalMachine->Personal). the cert name is "RpcOverHttp"
 
+### iis intergration since version 3.3.0
+we provided a http module for host rpc server on iis since version 3.3.0. 
+selfhost style:
+```
+	public class Program
+    {
+        public static void Main(string[] args)
+        {
+            var url = ConfigurationManager.AppSettings["urlPrefix"];
+            RpcServer server = new RpcServer();
+            server.Register<IRpcServiceSample, RpcServiceSample>();
+            server.Start(url);
+            Console.ReadLine();
+        }
+    }
+
+```
+
+and the iis module style:
+
+```
+	//dll name is RpcHost, namespace is RpcHost
+    public class RpcWebHostHttpModule : RpcServerHttpModule
+    {
+        public override void InitRpcServer(IRpcServer server)
+        {
+            server.Register<IRpcServiceSample, RpcServiceSample>();
+        }
+    }
+```
+
+*you should build your server project as a dll instead of an application(exe).*
+
+then copy all the output dlls into site’s bin folder(create one if non exists).
+
+then register the http module in web.config
+
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <system.web>
+        <compilation debug="true" targetFramework="4.5" />
+        <httpRuntime targetFramework="4.5" />
+    </system.web>
+    <system.webServer>
+        <modules>
+            <add name="RpcWebHostHttpModule" type="RpcHost.RpcWebHostHttpModule" />
+        </modules>
+        <httpProtocol>
+            <customHeaders>
+                <remove name="X-Powered-By" />
+            </customHeaders>
+        </httpProtocol>
+    </system.webServer>
+</configuration>
+
+```
+
+when edit the client side, two things:
+1) check the url. 2) optionally use *client.ServerCertificateValidationCallback* handle ssl certificate errors if host using https.

@@ -18,7 +18,9 @@ namespace RpcSample
         {
             try
             {
-                var client = RpcClient.Initialize("https://localhost:8970/", "../../../RpcHost/bin/Debug/RpcOverHttp.cer");
+                //var client = RpcClient.Initialize("http://127.0.0.1/", "../../../RpcHost/bin/Debug/RpcOverHttp.cer");
+                var client = RpcClient.Initialize("https://localhost:8443/", "../../../RpcHost/bin/Debug/RpcOverHttp.cer");
+                client.ServerCertificateValidationCallback = (a, b, c, d) => true;
                 var sample = client.Rpc<IRpcServiceSample>();
                 var username = sample.GetUserName();
                 Debug.Assert(username.Equals("Anonymous"));

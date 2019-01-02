@@ -9,10 +9,10 @@ using System.Threading.Tasks;
 
 namespace RpcOverHttp
 {
-    internal static class HttpListenerContextExtension
+    internal static class HttpContextExtension
     {
         public static Encoding Utf8NonBom = new UTF8Encoding(false);
-        public static void WriteOutput(this HttpListenerContext ctx, Stream outputStream, object value)
+        public static void WriteOutput(this IRpcHttpContext ctx, Stream outputStream, object value)
         {
             if (value == null)
                 value = "";

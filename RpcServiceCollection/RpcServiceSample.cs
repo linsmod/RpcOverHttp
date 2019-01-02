@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using RpcOverHttp;
+using static RpcOverHttp.Serialization.ProtoBufRpcDataSerializer;
 
 namespace RpcServiceCollection
 {
@@ -53,14 +54,16 @@ namespace RpcServiceCollection
 
         public void UploadStream(Stream stream, string fileName)
         {
-            var fs = File.Open(fileName, FileMode.Create);
+            var fullPath = Path.Combine(Path.GetTempPath(), fileName);
+            var fs = File.Open(fullPath, FileMode.Create);
             stream.CopyTo(fs);
             fs.Dispose();
         }
 
         public Stream DownloadStream(string fileName)
         {
-            var fs = File.Open(fileName, FileMode.Open);
+            var fullPath = Path.Combine(Path.GetTempPath(), fileName);
+            var fs = new TempFileStream(fullPath, FileMode.Open);
             return fs;
         }
     }
