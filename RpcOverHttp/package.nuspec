@@ -4,30 +4,29 @@
     <!--*-->
     <id>RpcOverHttp</id>
     <!--*-->
-    <version>3.2.0</version>
+    <version>3.3.0</version>
     <title>RpcOverHttp</title>
     <!--*-->
     <authors>tiny</authors>
     <owners>tiny</owners>
+    <projectUrl>https://www.nuget.org/packages/RpcOverHttp/</projectUrl>
     <!--
     <licenseUrl></licenseUrl>
-    <projectUrl></projectUrl>
     <iconUrl></iconUrl>
 -->
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <!--*-->
-    <description>.net interface based rpc framework using http protocol.</description>
+    <description>a .net interface based rpc framework using http protocol.</description>
     <!--*-->
-    <releaseNotes>add support for using Task/Task&lt;T&gt; as return type
-add support for using Stream as argument or return type
-add support for using AuthroizeAttribute, IExceptionHandler and IAuthorizeHandler like asp.net mvc projects.
-add support for custom request or response data serializer to override the built-in defaults.</releaseNotes>
+    <releaseNotes>
+      see https://www.nuget.org/packages/RpcOverHttp
+    </releaseNotes>
     <copyright>Copyright ©  2017 tiny@sandsea.info</copyright>
     <tags>rpc,ipc,http</tags>
     <dependencies>
-      <!--
-      <dependency id="SampleDependency" version="1.0" />
--->
+      <dependency id="Newtonsoft.Json" version="11.0.0.0" />
+      <dependency id="Pluralsight.Crypto" version="1.1.0.0" />
+      <dependency id="protobuf-net" version="2.4.0.0" />
     </dependencies>
   </metadata>
 </package>
