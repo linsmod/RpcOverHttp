@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -11,6 +12,8 @@ namespace RpcOverHttp
     /// </summary>
     public class RpcException : Exception
     {
+        public HttpWebResponse Response { get; internal set; }
+        public string ResponseContent { get; internal set; }
         public RpcError Detail { get; private set; }
         public RpcException(string mesage, Exception innerException, RpcErrorLocation location) : base(mesage, innerException)
         {

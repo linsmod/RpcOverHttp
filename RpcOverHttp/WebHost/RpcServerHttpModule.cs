@@ -41,6 +41,7 @@ namespace RpcOverHttp.WebHost
             if (!string.IsNullOrEmpty(ctx.Request.UserAgent)
                 && ctx.Request.UserAgent.IndexOf("RpcOverHttp", StringComparison.OrdinalIgnoreCase) != -1)
             {
+                ctx.Response.TrySkipIisCustomErrors = true;
                 server.ProcessRequest(new WebHost.SystemWebHttpContext(ctx));
                 ctx.CompleteRequest();
             }

@@ -14,6 +14,7 @@ using System.Net.Security;
 using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace RpcOverHttp
@@ -154,7 +155,7 @@ namespace RpcOverHttp
             {
                 headSerializer = this.factory.iocContainer.Resolve<IRpcHeadSerializer>("default");
             }
-            httprequest.UserAgent = "RpcClient-RpcOverHttp/"+this.version;
+            httprequest.UserAgent = "RpcClient-RpcOverHttp/" + this.version;
             httprequest.Headers.Add("meta", headSerializer.Serialize(request as RpcHead));
             httprequest.Headers.Add("Accept-Encoding", "gzip");
             httprequest.Proxy = factory.webProxy;
@@ -193,6 +194,8 @@ namespace RpcOverHttp
             var responseStream = httpresp.GetResponseStream();
             var readStream = gzip ? new GZipStream(httpresp.GetResponseStream(), CompressionMode.Decompress, false) : httpresp.GetResponseStream();
             responseStream.ReadTimeout = this.rpcTimeout;
+
+            Encoding encoding = Encoding.UTF8;
             if (httpresp.StatusCode == HttpStatusCode.OK || httpresp.StatusCode == HttpStatusCode.NoContent)
             {
                 return new RpcResponse(readStream, 0, 0);
@@ -200,15 +203,67 @@ namespace RpcOverHttp
             else if (httpresp.StatusCode == HttpStatusCode.InternalServerError
                 || httpresp.StatusCode == HttpStatusCode.Unauthorized)
             {
-                var streamReader = new StreamReader(readStream);
-                var errorDetail = streamReader.ReadToEnd();
-                var detail = JsonHelper.FromString<RpcError>(errorDetail);
-                throw new RpcException($"rpc request error. http.response.status_code={(int)httpresp.StatusCode}. see RpcException.Detail for more information.", detail, RpcErrorLocation.Remote);
+                var cnt = GetContent(readStream);
+                var detail = JsonHelper.FromString<RpcError>(cnt);
+                throw new RpcException($"rpc request error. http.response.status_code={(int)httpresp.StatusCode}. see RpcException.Detail for more information.", detail, RpcErrorLocation.Remote)
+                {
+                    Response = httpresp,
+                    ResponseContent = cnt,
+                };
             }
             else
             {
-                throw new RpcException($"rpc request error. http.response.status_code={(int)httpresp.StatusCode}.", (RpcError)null, RpcErrorLocation.Remote);
+
+                throw new RpcException($"rpc request error. http.response.status_code={(int)httpresp.StatusCode}.", (RpcError)null, RpcErrorLocation.Remote)
+                {
+                    Response = httpresp,
+                    ResponseContent = GetContent(readStream)
+                };
             }
+        }
+
+        private string GetContent(Stream readStream)
+        {
+            var stream = new MemoryStream();
+            readStream.CopyTo(stream);
+            stream.Position = 0;
+            var streamReader = new StreamReader(stream, Encoding.UTF8);
+            stream.Position = 0;
+            var cnt = streamReader.ReadToEnd();
+            stream.Position = 0;
+            var enc = getEncoding(cnt);
+            if (enc != Encoding.UTF8)
+            {
+                streamReader = new StreamReader(stream, enc);
+                cnt = streamReader.ReadToEnd();
+            }
+            return cnt;
+        }
+
+        private Encoding getEncoding(string cnt)
+        {
+            Encoding encoding = Encoding.UTF8;
+            Match match;
+            if ((match = Regex.Match(cnt, "<meta(.+)/>")).Success)
+            {
+                var meta = match.Groups[1].Value;
+                if (meta.IndexOf("Content-Type") != -1)
+                {
+                    if (meta.IndexOf("gb2312") != -1)
+                    {
+                        encoding = Encoding.GetEncoding("gb2312");
+                    }
+                    else if (meta.IndexOf("gbk") != -1)
+                    {
+                        encoding = Encoding.GetEncoding("gbk");
+                    }
+                    else if (meta.IndexOf("utf-8") != -1)
+                    {
+                        encoding = Encoding.GetEncoding("utf-8");
+                    }
+                }
+            }
+            return encoding;
         }
 
         private bool HandleException(Exception ex)
