@@ -24,8 +24,15 @@ namespace RpcOverHttp
                 {
                     return false;
                 }
-                var skipAuths = implMethod.GetCustomAttributes(true).OfType<AllowAnonymousAttribute>();
-                return implMethodAuthRequired && !skipAuths.Any() && !Thread.CurrentPrincipal.Identity.IsAuthenticated;
+                else if (auths.All(x => x.IsAuthroized()))
+                {
+                    return true;
+                }
+                else
+                {
+                    var skipAuths = implMethod.GetCustomAttributes(true).OfType<AllowAnonymousAttribute>();
+                    return implMethodAuthRequired && !skipAuths.Any() && !Thread.CurrentPrincipal.Identity.IsAuthenticated;
+                }
             }
             return true;
         }

@@ -34,9 +34,12 @@ namespace RpcOverHttp
                     var itemDir = Path.GetDirectoryName(itemPath);
                     if (!Directory.Exists(itemDir))
                         Directory.CreateDirectory(itemDir);
-                    using (var fs = File.Create(itemPath))
+                    if (!string.IsNullOrEmpty(entry.Name))
                     {
-                        stream.CopyTo(fs);
+                        using (var fs = File.Create(itemPath))
+                        {
+                            stream.CopyTo(fs);
+                        }
                     }
                 }
             }
