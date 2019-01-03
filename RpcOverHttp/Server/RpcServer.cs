@@ -318,7 +318,14 @@ namespace RpcOverHttp
                                                 }
                                                 IDisposable value = returnVal as IDisposable;
                                                 if (value != null)
+                                                {
                                                     try { value.Dispose(); } catch { }
+                                                }
+                                                IDisposable inst = impl as IDisposable;
+                                                if (inst != null)
+                                                {
+                                                    try { inst.Dispose(); } catch { }
+                                                }
                                             }
                                             return;
                                         }

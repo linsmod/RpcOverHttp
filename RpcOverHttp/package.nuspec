@@ -4,12 +4,12 @@
     <!--*-->
     <id>RpcOverHttp</id>
     <!--*-->
-    <version>3.3.1</version>
+    <version>3.3.2</version>
     <title>RpcOverHttp</title>
     <!--*-->
     <authors>tiny</authors>
     <owners>tiny</owners>
-    <projectUrl>https://www.nuget.org/packages/RpcOverHttp/</projectUrl>
+    <projectUrl>https://github.com/kissstudio/rpcoverhttp</projectUrl>
     <!--
     <licenseUrl></licenseUrl>
     <iconUrl></iconUrl>
@@ -19,7 +19,7 @@
     <description>a .net interface based rpc framework using http protocol.</description>
     <!--*-->
     <releaseNotes>
-      see https://www.nuget.org/packages/RpcOverHttp
+      see https://github.com/kissstudio/rpcoverhttp
     </releaseNotes>
     <copyright>Copyright ©  2017 tiny@sandsea.info</copyright>
     <tags>rpc,ipc,http</tags>
