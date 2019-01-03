@@ -48,6 +48,7 @@
   <ItemGroup>
     <Compile Include="AllowAnonymousAttribute.cs" />
     <Compile Include="IExceptionHandler.cs" />
+    <Compile Include="IRpcWebSocketContext.cs" />
     <Compile Include="ReflectionHelper.cs" />
     <Compile Include="AuthorizeAttribute.cs" />
     <Compile Include="Certificate.cs" />
@@ -62,12 +63,14 @@
     <Compile Include="DynamicProxyImplementation\TypeHelper.cs" />
     <Compile Include="ByteSize.cs" />
     <Compile Include="Client\RpcClient.cs" />
+    <Compile Include="RemoteEventSubscriptionKey.cs" />
     <Compile Include="RpcError.cs" />
     <Compile Include="HttpContextExtension.cs" />
     <Compile Include="Client\RpcDynamicProxyFactory.cs" />
     <Compile Include="RpcHttpContext.cs" />
     <Compile Include="RpcService.cs" />
     <Compile Include="SelfHost\SystemNetHttpContext.cs" />
+    <Compile Include="SelfHost\SystemNetWebSocketContext.cs" />
     <Compile Include="Serialization\IRpcDataSerializer.cs" />
     <Compile Include="Serialization\TempFileStream.cs" />
     <Compile Include="Server\IRpcServiceAdministration.cs" />
@@ -87,6 +90,7 @@
     <Compile Include="TinyIoC.cs" />
     <Compile Include="WebHost\RpcServerHttpModule.cs" />
     <Compile Include="WebHost\SystemWebHttpContext.cs" />
+    <Compile Include="WebHost\SystemWebWebSocketContext.cs" />
     <Compile Include="ZipHelper.cs" />
   </ItemGroup>
   <ItemGroup>

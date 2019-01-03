@@ -11,10 +11,12 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Net.Http;
 using System.Net.Security;
+using System.Net.WebSockets;
 using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace RpcOverHttp
@@ -24,6 +26,8 @@ namespace RpcOverHttp
         DynamicProxyFactory<RpcOverHttpDaynamicProxy> factory = new DynamicProxyFactory<RpcOverHttpDaynamicProxy>(new DynamicInterfaceImplementor());
         internal WebProxy webProxy;
         internal TinyIoC.TinyIoCContainer iocContainer;
+        internal string websocketServer;
+
         internal RpcDynamicProxyFactory(Uri url, WebProxy proxy, TinyIoC.TinyIoCContainer iocContainer)
         {
             this.ApiUrl = url;
@@ -45,6 +49,9 @@ namespace RpcOverHttp
     internal class RpcOverHttpDaynamicProxy : DynamicProxy
     {
         string token;
+        bool wsconnected = false;
+        ClientWebSocket clientWebSocket = new ClientWebSocket();
+        private object wsLock = new object();
         RpcDynamicProxyFactory factory;
         private Version version;
         MethodInfo methodMakeGenericTask;
@@ -352,10 +359,30 @@ namespace RpcOverHttp
             return null;
         }
 
-        protected override bool TrySetEvent(Type interfaceType, string name, object value)
+        /// <summary>
+        /// key = interface.method + . + eventhandler.method
+        /// </summary>
+        Dictionary<RemoteEventSubscriptionKey, MethodInfo> subscriptions = new Dictionary<RemoteEventSubscriptionKey, MethodInfo>();
+
+        protected override bool TrySetEvent(Type interfaceType, string name, object value,bool add)
         {
-            EventInfo e = interfaceType.GetEvent(name);
-            if (value != null) //add_EventHandler
+            EventInfo e = TypeHelper.GetEventInfo(interfaceType, name);
+            if (!wsconnected)
+            {
+                lock (wsLock)
+                {
+                    if (!wsconnected)
+                    {
+                        clientWebSocket.ConnectAsync(new Uri(this.factory.websocketServer), CancellationToken.None).GetAwaiter().GetResult();
+                        var ms = new MemoryStream();
+                        var br = new BinaryWriter(ms);
+                        br.Write(interfaceType.Namespace);
+                        AddSubscription(e.AddMethod, (value as EventHandler).Method);
+                    }
+                }
+            }
+
+            if (add) //add_EventHandler
             {
                 object result;
                 this.TryInvokeMember(interfaceType, e.AddMethod.MetadataToken, true, new object[] { (value as EventHandler).Method.MetadataToken }, out result);
@@ -366,6 +393,40 @@ namespace RpcOverHttp
                 this.TryInvokeMember(interfaceType, e.RemoveMethod.MetadataToken, true, new object[] { value }, out result);
             }
             return true;
+        }
+        private void AddSubscription(MethodInfo interfaceMethod, MethodInfo eventHandlerMethod)
+        {
+            var key = new RemoteEventSubscriptionKey(interfaceMethod, eventHandlerMethod);
+            //0x00 + id
+            var idk = BitConverter.GetBytes(key.GetHashCode());
+            var msg = new byte[5] { 0x00, idk[0], idk[1], idk[2], idk[3] };
+            lock (subscriptions)
+            {
+                clientWebSocket
+                            .SendAsync(new ArraySegment<byte>(msg),
+                            WebSocketMessageType.Binary,
+                            false,
+                            CancellationToken.None).Wait();
+                if (!subscriptions.ContainsKey(key))
+                    subscriptions.Add(key, eventHandlerMethod);
+            }
+        }
+
+        private void RemoveSubscription(MethodInfo interfaceMethod, MethodInfo eventHandlerMethod)
+        {
+            var key = new RemoteEventSubscriptionKey(interfaceMethod, eventHandlerMethod);
+            //0x01 + id
+            var idk = BitConverter.GetBytes(key.GetHashCode());
+            var msg = new byte[5] { 0x00, idk[0], idk[1], idk[2], idk[3] };
+            lock (subscriptions)
+            {
+                clientWebSocket
+                            .SendAsync(new ArraySegment<byte>(msg),
+                            WebSocketMessageType.Binary,
+                            false,
+                            CancellationToken.None).Wait();
+                subscriptions.Remove(key);
+            }
         }
 
         protected override bool TrySetMember(Type interfaceType, string name, object value)

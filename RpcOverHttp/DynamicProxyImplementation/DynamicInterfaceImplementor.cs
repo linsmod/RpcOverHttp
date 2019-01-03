@@ -23,6 +23,7 @@ namespace DynamicProxyImplementation
         {
             tryGetMemberMethodInfo = DynamicProxy.TryGetMemberMethodInfo;
             trySetMemberMethodInfo = DynamicProxy.TrySetMemberMethodInfo;
+            trySetEventMethodInfo = DynamicProxy.TrySetEventMethodInfo;
             tryInvokeMemberInfo = DynamicProxy.TryInvokeMemberMethodInfo;
 
             Type ownClass = typeof(DynamicInterfaceImplementor);
@@ -58,6 +59,7 @@ namespace DynamicProxyImplementation
 
         private MethodInfo tryGetMemberMethodInfo = null;
         private MethodInfo trySetMemberMethodInfo = null;
+        private MethodInfo trySetEventMethodInfo = null;
         private MethodInfo tryInvokeMemberInfo = null;
 
         public virtual Type CreateType(Type interfaceType, Type dynamicProxyBaseType)
@@ -309,7 +311,8 @@ namespace DynamicProxyImplementation
             ilGenerator.Emit(OpCodes.Ldstr, eventName);
             ilGenerator.Emit(OpCodes.Ldarg_0);
             ilGenerator.Emit(OpCodes.Ldfld, eventField);
-            ilGenerator.EmitCall(OpCodes.Callvirt, trySetMemberMethodInfo, null);
+            ilGenerator.Emit(OpCodes.Ldc_I4, 1);
+            ilGenerator.EmitCall(OpCodes.Callvirt, trySetEventMethodInfo, null);
             ilGenerator.Emit(OpCodes.Stloc_2);
 
             //C#: return
@@ -343,7 +346,8 @@ namespace DynamicProxyImplementation
             ilGenerator.Emit(OpCodes.Ldstr, eventName);
             ilGenerator.Emit(OpCodes.Ldarg_0);
             ilGenerator.Emit(OpCodes.Ldfld, eventField);
-            ilGenerator.EmitCall(OpCodes.Callvirt, trySetMemberMethodInfo, null);
+            ilGenerator.Emit(OpCodes.Ldc_I4, 0);
+            ilGenerator.EmitCall(OpCodes.Callvirt, trySetEventMethodInfo, null);
             ilGenerator.Emit(OpCodes.Stloc_2);
 
             //C#: return

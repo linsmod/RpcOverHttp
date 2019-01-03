@@ -37,13 +37,13 @@ namespace RpcOverHttp.WebHost
 
         private void Context_BeginRequest(object sender, EventArgs e)
         {
-            var ctx = sender as HttpApplication;
-            if (!string.IsNullOrEmpty(ctx.Request.UserAgent)
-                && ctx.Request.UserAgent.IndexOf("RpcOverHttp", StringComparison.OrdinalIgnoreCase) != -1)
+            var application = sender as HttpApplication;
+            if (!string.IsNullOrEmpty(application.Request.UserAgent)
+                && application.Request.UserAgent.IndexOf("RpcOverHttp", StringComparison.OrdinalIgnoreCase) != -1)
             {
-                ctx.Response.TrySkipIisCustomErrors = true;
-                server.ProcessRequest(new WebHost.SystemWebHttpContext(ctx));
-                ctx.CompleteRequest();
+                application.Response.TrySkipIisCustomErrors = true;
+                server.ProcessRequest(new WebHost.SystemWebHttpContext(application.Context));
+                application.CompleteRequest();
             }
         }
     }

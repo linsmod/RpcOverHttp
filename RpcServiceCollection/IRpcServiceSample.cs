@@ -1,10 +1,12 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace RpcServiceCollection
 {
     public interface IRpcServiceSample
     {
+        event EventHandler TestEventHandler;
         string GetUserName();
         bool IsUserAuthenticated();
         void TestAccessDeniend();

@@ -16,6 +16,8 @@ namespace RpcServiceCollection
         {
         }
 
+        public event EventHandler TestEventHandler;
+
         public override RpcIdentity Authroize(string token)
         {
             return base.Authroize(token);

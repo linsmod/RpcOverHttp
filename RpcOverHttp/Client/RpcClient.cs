@@ -114,21 +114,31 @@ namespace RpcOverHttp
             var iocContainer = new TinyIoC.TinyIoCContainer();
             iocContainer.Register<IRpcDataSerializer, ProtoBufRpcDataSerializer>(new ProtoBufRpcDataSerializer(), "default");
             iocContainer.Register<IRpcHeadSerializer, JsonRpcHeadSerializer>(new JsonRpcHeadSerializer(), "default");
-            
+
             var _proxyFactory = new RpcDynamicProxyFactory(url, proxy, iocContainer);
-            var client = new RpcClient(_proxyFactory, proxy, iocContainer);
+            var websocketServer = ""; 
+             var client = new RpcClient(_proxyFactory, proxy, iocContainer);
             if (!string.IsNullOrEmpty(cerFilePath))
             {
                 if (!System.IO.File.Exists(cerFilePath))
                     throw new Exception("the cer file you provided is not exists. " + Path.GetFileName(cerFilePath));
                 client.AddCertForHttps(cerFilePath);
             }
-            if (url.Scheme == ("https") && !Certs.Any())
+            if (url.Scheme == ("https"))
             {
-                throw new Exception("you should provide a cert when using https.");
+                websocketServer = url.AbsoluteUri.Replace("https://", "wss://");
+                if (!Certs.Any())
+                {
+                    throw new Exception("you should provide a cert when using https.");
+                }
+            }
+            else
+            {
+                websocketServer = url.AbsoluteUri.Replace("http://", "ws://");
             }
             var cb = new RemoteCertificateValidationCallback(client.RemoteCertificateValidationCallback);
             _proxyFactory.ServerCertificateValidationCallback = cb;
+            _proxyFactory.websocketServer = websocketServer;
             return client;
         }
 

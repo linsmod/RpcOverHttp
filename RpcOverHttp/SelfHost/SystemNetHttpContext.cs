@@ -18,6 +18,20 @@ namespace RpcOverHttp.SelfHost
             this.ctx = ctx;
         }
 
+        public void AcceptWebSocket(Func<IRpcWebSocketContext, Task> userFunc)
+        {
+            var wsctx = new SystemNetWebSocketContext(ctx.AcceptWebSocketAsync("rpc").Result);
+            userFunc(wsctx).Wait();
+        }
+
+        public bool IsWebSocketRequest
+        {
+            get
+            {
+                return this.ctx.Request.IsWebSocketRequest;
+            }
+        }
+
         IRpcHttpRequest IRpcHttpContext.Request
         {
             get

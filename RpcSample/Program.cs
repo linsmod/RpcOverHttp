@@ -18,10 +18,13 @@ namespace RpcSample
         {
             try
             {
-                //var client = RpcClient.Initialize("http://127.0.0.1/", "../../../RpcHost/bin/Debug/RpcOverHttp.cer");
-                var client = RpcClient.Initialize("https://localhost:8443/", "../../../RpcHost/bin/Debug/RpcOverHttp.cer");
+                var client = RpcClient.Initialize("http://127.0.0.1/");
+                //var client = RpcClient.Initialize("https://localhost:8443/", "../../../RpcHost/bin/Debug/RpcOverHttp.cer");
                 client.ServerCertificateValidationCallback = (a, b, c, d) => true;
                 var sample = client.Rpc<IRpcServiceSample>();
+                //sample.TestEventHandler += Sample_TestEventHandler;
+                //sample.TestEventHandler += Sample_TestEventHandler;
+                sample.TestEventHandler -= Sample_TestEventHandler;
                 var username = sample.GetUserName();
                 Debug.Assert(username.Equals("Anonymous"));
                 Console.WriteLine("GetUserName ok");
@@ -76,6 +79,16 @@ namespace RpcSample
                 Console.WriteLine(ex);
             }
             Console.ReadLine();
+        }
+
+        private static void Sample_TestEventHandler1(object sender, EventArgs e)
+        {
+            throw new NotImplementedException();
+        }
+
+        private static void Sample_TestEventHandler(object sender, EventArgs e)
+        {
+            throw new NotImplementedException();
         }
     }
 }

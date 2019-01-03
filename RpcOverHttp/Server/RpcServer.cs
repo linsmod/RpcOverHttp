@@ -75,7 +75,24 @@ namespace RpcOverHttp
 
         public void ProcessRequest(IRpcHttpContext ctx)
         {
-            this.ProcessRequestInternal(ctx);
+            if (ctx.IsWebSocketRequest)
+            {
+                ctx.AcceptWebSocket(ProcessWebsocketRequest);
+            }
+            else
+            {
+                this.ProcessRequestInternal(ctx);
+            }
+        }
+
+        private Task ProcessWebsocketRequest(IRpcWebSocketContext ctx)
+        {
+            return Task.Run(async () =>
+            {
+                var buffer = new ArraySegment<byte>(new byte[5]);
+                await ctx.WebSocket.ReceiveAsync(buffer, CancellationToken.None);
+
+            });
         }
 
         public void Stop()
