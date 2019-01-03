@@ -45,12 +45,14 @@ namespace RpcOverHttp
     {
         string token;
         RpcDynamicProxyFactory factory;
+        private Version version;
         MethodInfo methodMakeGenericTask;
         private int rpcTimeout = 120 * 1000;
         public RpcOverHttpDaynamicProxy(RpcDynamicProxyFactory factory, string token)
         {
             this.token = token;
             this.factory = factory;
+            this.version = typeof(RpcResponse).Assembly.GetName().Version;
         }
 
         protected override bool TryGetMember(Type interfaceType, string name, out object result)
@@ -152,6 +154,7 @@ namespace RpcOverHttp
             {
                 headSerializer = this.factory.iocContainer.Resolve<IRpcHeadSerializer>("default");
             }
+            httprequest.UserAgent = "RpcClient-RpcOverHttp/"+this.version;
             httprequest.Headers.Add("meta", headSerializer.Serialize(request as RpcHead));
             httprequest.Headers.Add("Accept-Encoding", "gzip");
             httprequest.Proxy = factory.webProxy;

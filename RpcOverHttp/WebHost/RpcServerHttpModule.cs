@@ -38,8 +38,12 @@ namespace RpcOverHttp.WebHost
         private void Context_BeginRequest(object sender, EventArgs e)
         {
             var ctx = sender as HttpApplication;
-            ctx.Response.ClearHeaders();
-            server.ProcessRequest(new WebHost.SystemWebHttpContext(ctx));
+            if (!string.IsNullOrEmpty(ctx.Request.UserAgent)
+                && ctx.Request.UserAgent.IndexOf("RpcOverHttp", StringComparison.OrdinalIgnoreCase) != -1)
+            {
+                server.ProcessRequest(new WebHost.SystemWebHttpContext(ctx));
+                ctx.CompleteRequest();
+            }
         }
     }
 }

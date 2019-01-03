@@ -103,8 +103,6 @@ namespace RpcOverHttp
         internal void ProcessRequestInternal(object state)
         {
             var ctx = state as IRpcHttpContext;
-            ctx.Response.KeepAlive = ctx.Request.KeepAlive;
-            ctx.Response.AddHeader("Server", "kisstudio-RpcOverHttp/1.0");
             Stream outputStream = ctx.Response.OutputStream;
             bool acceptGzip = AcceptsGzip(ctx.Request);
             if (acceptGzip)
@@ -115,6 +113,8 @@ namespace RpcOverHttp
             }
             try
             {
+                ctx.Response.KeepAlive = ctx.Request.KeepAlive;
+                ctx.Response.AddHeader("Server", "RpcServer-RpcOverHttp/1.0");
                 if (ctx.Request.Url.AbsolutePath == "/metadata") //接口方法定义和方法实现之间的映射信息
                 {
                     this.WriteMetadata(ctx, outputStream);
