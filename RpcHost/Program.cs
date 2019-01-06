@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 using RpcOverHttp.WebHost;
+using System.Diagnostics;
 
 namespace RpcHost
 {
@@ -24,11 +25,8 @@ namespace RpcHost
         }
     }
 
-    public class RpcWebHostHttpModule : RpcServerHttpModule
+    public class RpcWebHostHttpHandler : RpcServerHttpHandler
     {
-        public RpcWebHostHttpModule()
-        {
-        }
         public override void InitRpcServer(IRpcServer server)
         {
             server.Register<IRpcServiceSample, RpcServiceSample>();

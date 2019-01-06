@@ -56,6 +56,7 @@ namespace RpcOverHttp
         private Version version;
         MethodInfo methodMakeGenericTask;
         private int rpcTimeout = 120 * 1000;
+        private Guid instanceId = Guid.NewGuid();
         public RpcOverHttpDaynamicProxy(RpcDynamicProxyFactory factory, string token)
         {
             this.token = token;
@@ -80,6 +81,7 @@ namespace RpcOverHttp
                 request.MethodName = method.Name;
                 request.MethodMDToken = mdToken;
                 request.Token = this.token;
+                request.InstanceId = this.instanceId;
                 request.EventOp = eventOp;
                 request.Arguments = args;
                 var state = new ClientRpcState { Method = method, Request = request };
@@ -109,7 +111,7 @@ namespace RpcOverHttp
             catch (AggregateException ae)
             {
                 var rpcError = new RpcError(ae.InnerException.Message, new StackTrace(ae.InnerException).ToString());
-                throw new RpcException("rpc request error. ", rpcError, RpcErrorLocation.Local);
+                throw new RpcException("rpc request error. ", rpcError, RpcErrorLocation.Client);
             }
             catch (RpcException)
             {
@@ -118,7 +120,7 @@ namespace RpcOverHttp
             catch (Exception ex)
             {
                 var rpcError = new RpcError(ex.Message, new StackTrace(ex).ToString());
-                throw new RpcException("rpc request error. ", rpcError, RpcErrorLocation.Local);
+                throw new RpcException("rpc request error. ", rpcError, RpcErrorLocation.Client);
             }
         }
 
@@ -173,7 +175,12 @@ namespace RpcOverHttp
             {
                 serializer = this.factory.iocContainer.Resolve<IRpcDataSerializer>("default");
             }
-            serializer.Serialize(writeStream, method.GetParameters().Select(x => x.ParameterType).ToArray(), request.Arguments);
+            var argTypes = method.GetParameters().Select(x => x.ParameterType).ToArray();
+            if (request.EventOp)
+            {
+                FixupRemoteEventKey(argTypes, request.Arguments);
+            }
+            serializer.Serialize(writeStream, argTypes, request.Arguments);
             writeStream.Flush();
             try
             {
@@ -189,6 +196,15 @@ namespace RpcOverHttp
                 }
                 else
                     throw;
+            }
+        }
+
+        private void FixupRemoteEventKey(Type[] argTypes, object[] args)
+        {
+            for (int i = 0; i < argTypes.Length; i++)
+            {
+                argTypes[i] = typeof(int);
+                args[i] = (args[i] as RemoteEventSubscriptionKey).GetHashCode();
             }
         }
 
@@ -212,7 +228,7 @@ namespace RpcOverHttp
             {
                 var cnt = GetContent(readStream);
                 var detail = JsonHelper.FromString<RpcError>(cnt);
-                throw new RpcException($"rpc request error. http.response.status_code={(int)httpresp.StatusCode}. see RpcException.Detail for more information.", detail, RpcErrorLocation.Remote)
+                throw new RpcException($"rpc request error. http.response.status_code={(int)httpresp.StatusCode}. see RpcException.Detail for more information.", detail, RpcErrorLocation.Server)
                 {
                     Response = httpresp,
                     ResponseContent = cnt,
@@ -221,7 +237,7 @@ namespace RpcOverHttp
             else
             {
 
-                throw new RpcException($"rpc request error. http.response.status_code={(int)httpresp.StatusCode}.", (RpcError)null, RpcErrorLocation.Remote)
+                throw new RpcException($"rpc request error. http.response.status_code={(int)httpresp.StatusCode}.", (RpcError)null, RpcErrorLocation.Server)
                 {
                     Response = httpresp,
                     ResponseContent = GetContent(readStream)
@@ -319,7 +335,7 @@ namespace RpcOverHttp
                             }
                             catch (Exception ex)
                             {
-                                throw new RpcException("failed to deserialize response data, check inner exception for more information.", ex, RpcErrorLocation.Local);
+                                throw new RpcException("failed to deserialize response data, check inner exception for more information.", ex, RpcErrorLocation.Client);
                             }
                         }
                         else
@@ -333,7 +349,7 @@ namespace RpcOverHttp
                         }
                         catch (Exception ex)
                         {
-                            throw new RpcException("failed to deserialize response data, check inner exception for more information.", ex, RpcErrorLocation.Local);
+                            throw new RpcException("failed to deserialize response data, check inner exception for more information.", ex, RpcErrorLocation.Client);
                         }
                     }
                 }
@@ -364,7 +380,53 @@ namespace RpcOverHttp
         /// </summary>
         Dictionary<RemoteEventSubscriptionKey, MethodInfo> subscriptions = new Dictionary<RemoteEventSubscriptionKey, MethodInfo>();
 
-        protected override bool TrySetEvent(Type interfaceType, string name, object value,bool add)
+        private async Task EventListenerThread()
+        {
+            IRpcDataSerializer serializer;
+            if (!this.factory.iocContainer.TryResolve(out serializer))
+            {
+                serializer = this.factory.iocContainer.Resolve<IRpcDataSerializer>("default");
+            }
+            const int maxMessageSize = 1024;
+            var receivedDataBuffer = new ArraySegment<Byte>(new Byte[maxMessageSize]);
+            while (clientWebSocket.State == WebSocketState.Open)
+            {
+                var wsResult = await clientWebSocket.ReceiveAsync(receivedDataBuffer, CancellationToken.None);
+                using (var inputms = new MemoryStream(receivedDataBuffer.Take(wsResult.Count).ToArray()))
+                {
+                    //response = eventKey + arguments
+                    var keyBytes = new byte[4];
+                    inputms.Read(keyBytes, 0, keyBytes.Length);
+                    var eventKey = BitConverter.ToInt32(keyBytes, 0);
+                    var key = this.subscriptions.Keys.Single(x => x == eventKey);
+                    var handlerMethod = this.subscriptions[key];
+                    var arguments = serializer.Deserialize(inputms, handlerMethod.GetParameters().Select(x => x.ParameterType).ToArray());
+
+                    IRpcEventHandleResult result =
+                        handlerMethod.ReturnType == typeof(void) ?
+                        new RpcEventHandleResultVoid() :
+                        Activator.CreateInstance(typeof(RpcEventHandleResultGeneral<>).MakeGenericType(handlerMethod.ReturnType)) as IRpcEventHandleResult;
+
+                    object retVal = null;
+                    try
+                    {
+                        retVal = handlerMethod.Invoke(this, arguments);
+                        result.Value = retVal;
+                    }
+                    catch (Exception ex)
+                    {
+                        result.Error = RpcError.FromException(ex);
+                    }
+                    using (var outputms = new MemoryStream())
+                    {
+                        serializer.Serialize(outputms, new Type[] { result.GetType() }, new object[] { result });
+                        await clientWebSocket.SendAsync(new ArraySegment<byte>(outputms.ToArray()), WebSocketMessageType.Binary, true, CancellationToken.None);
+                    }
+                }
+            }
+        }
+
+        protected override bool TrySetEvent(Type interfaceType, string name, object value, bool add)
         {
             EventInfo e = TypeHelper.GetEventInfo(interfaceType, name);
             if (!wsconnected)
@@ -373,65 +435,59 @@ namespace RpcOverHttp
                 {
                     if (!wsconnected)
                     {
-                        clientWebSocket.ConnectAsync(new Uri(this.factory.websocketServer), CancellationToken.None).GetAwaiter().GetResult();
-                        var ms = new MemoryStream();
-                        var br = new BinaryWriter(ms);
-                        br.Write(interfaceType.Namespace);
-                        AddSubscription(e.AddMethod, (value as EventHandler).Method);
+                        clientWebSocket.ConnectAsync(new Uri(this.factory.websocketServer + "?instanceId=" + this.instanceId), CancellationToken.None).Wait();
+                        wsconnected = true;
+                        Task.Factory.StartNew(EventListenerThread);
                     }
                 }
             }
 
             if (add) //add_EventHandler
             {
-                object result;
-                this.TryInvokeMember(interfaceType, e.AddMethod.MetadataToken, true, new object[] { (value as EventHandler).Method.MetadataToken }, out result);
+                lock (subscriptions)
+                {
+                    var key = AddSubscription(interfaceType, name, (value as Delegate).Method);
+                    object result;
+                    this.TryInvokeMember(interfaceType, e.AddMethod.MetadataToken, true, new object[] { key }, out result);
+                }
             }
             else //remove_EventHandler
             {
-                object result;
-                this.TryInvokeMember(interfaceType, e.RemoveMethod.MetadataToken, true, new object[] { value }, out result);
+                lock (subscriptions)
+                {
+                    var key = RemoveSubscription(interfaceType, name, (value as Delegate).Method);
+                    object result;
+                    this.TryInvokeMember(interfaceType, e.RemoveMethod.MetadataToken, true, new object[] { key }, out result);
+                }
             }
             return true;
         }
-        private void AddSubscription(MethodInfo interfaceMethod, MethodInfo eventHandlerMethod)
+        private RemoteEventSubscriptionKey AddSubscription(Type interfaceType, string eventName, MethodInfo eventHandlerMethod)
         {
-            var key = new RemoteEventSubscriptionKey(interfaceMethod, eventHandlerMethod);
-            //0x00 + id
+            var key = new RemoteEventSubscriptionKey(interfaceType, eventName, eventHandlerMethod);
             var idk = BitConverter.GetBytes(key.GetHashCode());
-            var msg = new byte[5] { 0x00, idk[0], idk[1], idk[2], idk[3] };
-            lock (subscriptions)
-            {
-                clientWebSocket
-                            .SendAsync(new ArraySegment<byte>(msg),
-                            WebSocketMessageType.Binary,
-                            false,
-                            CancellationToken.None).Wait();
-                if (!subscriptions.ContainsKey(key))
-                    subscriptions.Add(key, eventHandlerMethod);
-            }
+            if (!subscriptions.ContainsKey(key))
+                subscriptions.Add(key, eventHandlerMethod);
+            return key;
         }
 
-        private void RemoveSubscription(MethodInfo interfaceMethod, MethodInfo eventHandlerMethod)
+        private RemoteEventSubscriptionKey RemoveSubscription(Type interfaceType, string eventName, MethodInfo eventHandlerMethod)
         {
-            var key = new RemoteEventSubscriptionKey(interfaceMethod, eventHandlerMethod);
-            //0x01 + id
+            var key = new RemoteEventSubscriptionKey(interfaceType, eventName, eventHandlerMethod);
             var idk = BitConverter.GetBytes(key.GetHashCode());
-            var msg = new byte[5] { 0x00, idk[0], idk[1], idk[2], idk[3] };
-            lock (subscriptions)
-            {
-                clientWebSocket
-                            .SendAsync(new ArraySegment<byte>(msg),
-                            WebSocketMessageType.Binary,
-                            false,
-                            CancellationToken.None).Wait();
-                subscriptions.Remove(key);
-            }
+            subscriptions.Remove(key);
+            return key;
         }
 
         protected override bool TrySetMember(Type interfaceType, string name, object value)
         {
             throw new NotImplementedException();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            clientWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "dispose", CancellationToken.None).Wait();
+            base.Dispose(disposing);
         }
     }
 }

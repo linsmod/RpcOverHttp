@@ -6,6 +6,7 @@ using System.Reflection.Emit;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using TinyIoC;
 
 namespace RpcOverHttp
 {
@@ -54,11 +55,7 @@ namespace RpcOverHttp
         {
             Type instanceType = instance.GetType();
             var returnType = itfMethod.ReturnType;
-            if (eventOp)
-            {
-                //TODO:事件处理程序的注册和注销
-                var d = CreateEventHandler(itfMethod);
-            }
+            
             var implAttrs = implMethod.GetCustomAttributes(true);
             var timeoutControl = implAttrs.OfType<TimeoutAttribute>();
             TimeoutAttribute timeoutAttr = null;
@@ -103,7 +100,6 @@ namespace RpcOverHttp
                 if (pType.FullName == "System.MulticastDelegate")
                 {
                     AssemblyName assemblyName = new AssemblyName(Guid.NewGuid().ToString());
-
                     AssemblyBuilder ab = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave);
                     var moduleBuilder = ab.DefineDynamicModule(assemblyName.Name, string.Concat(assemblyName.Name, ".dll"));
                 }

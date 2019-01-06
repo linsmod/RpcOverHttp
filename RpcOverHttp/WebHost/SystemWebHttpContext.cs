@@ -25,7 +25,7 @@ namespace RpcOverHttp.WebHost
         public void AcceptWebSocket(Func<IRpcWebSocketContext, Task> userFunc)
         {
             ctx.Items["wsUserFunc"] = userFunc;
-            ctx.AcceptWebSocketRequest(ProcessRequest, new AspNetWebSocketOptions { SubProtocol = "rpc" });
+            ctx.AcceptWebSocketRequest(ProcessRequest);
         }
 
         public bool IsWebSocketRequest
@@ -36,10 +36,10 @@ namespace RpcOverHttp.WebHost
             }
         }
 
-        private Task ProcessRequest(AspNetWebSocketContext ctx)
+        private async Task ProcessRequest(AspNetWebSocketContext ctx)
         {
             var userFunc = ctx.Items["wsUserFunc"] as Func<IRpcWebSocketContext, Task>;
-            return userFunc(new SystemWebWebSocketContext(ctx));
+            await userFunc(new SystemWebWebSocketContext(ctx));
         }
 
         public class AspNetWebSocketContextWrapper : AspNetWebSocketContext
@@ -115,6 +115,13 @@ namespace RpcOverHttp.WebHost
             get
             {
                 return request.Url;
+            }
+        }
+        string IRpcHttpRequest.UserAgent
+        {
+            get
+            {
+                return request.UserAgent;
             }
         }
     }

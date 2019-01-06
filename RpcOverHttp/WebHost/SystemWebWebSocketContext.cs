@@ -21,5 +21,13 @@ namespace RpcOverHttp.WebHost
         {
             get { return ctx.WebSocket; }
         }
+
+        Uri IRpcWebSocketContext.RequestUri
+        {
+            get
+            {
+                return ctx.RequestUri;
+            }
+        }
     }
 }

@@ -48,6 +48,8 @@
   <ItemGroup>
     <Compile Include="AllowAnonymousAttribute.cs" />
     <Compile Include="IExceptionHandler.cs" />
+    <Compile Include="Internal\CommonEventHandler.cs" />
+    <Compile Include="Internal\BlockingQueue.cs" />
     <Compile Include="IRpcWebSocketContext.cs" />
     <Compile Include="ReflectionHelper.cs" />
     <Compile Include="AuthorizeAttribute.cs" />
@@ -100,6 +102,9 @@
     <None Include="package.nuspec" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Mono.Cecil">
+      <Version>0.10.1</Version>
+    </PackageReference>
     <PackageReference Include="Newtonsoft.Json">
       <Version>11.0.2</Version>
     </PackageReference>

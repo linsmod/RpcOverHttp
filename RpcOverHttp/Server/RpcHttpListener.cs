@@ -45,12 +45,20 @@ namespace RpcOverHttp
                 {
                     try
                     {
-                        HttpListenerContext ctx = httpListener.GetContext();
-                        Task.Factory.StartNew(new Action<object>(rpcServer.ProcessRequestInternal), new SystemNetHttpContext(ctx));
+                        HttpListenerContext ctx_raw = httpListener.GetContext();
+                        IRpcHttpContext ctx = new SystemNetHttpContext(ctx_raw);
+                        if (ctx_raw.Request.IsWebSocketRequest)
+                        {
+                            ctx.AcceptWebSocket(rpcServer.ProcessWebsocketRequest);
+                        }
+                        else
+                        {
+                            Task.Factory.StartNew(new Action<object>(rpcServer.ProcessRequestInternal), ctx);
+                        }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine("Error:" + ex.Message);
+                        Console.WriteLine(ex);
                     }
                 }
             }))

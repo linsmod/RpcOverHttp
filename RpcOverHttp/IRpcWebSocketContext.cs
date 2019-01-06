@@ -10,5 +10,6 @@ namespace RpcOverHttp
     public interface IRpcWebSocketContext
     {
         WebSocket WebSocket { get; }
+        Uri RequestUri { get; }
     }
 }

@@ -1,4 +1,6 @@
-﻿using RpcOverHttp.Serialization;
+﻿using DynamicProxyImplementation;
+using RpcOverHttp.Internal;
+using RpcOverHttp.Serialization;
 using RpcOverHttp.Server;
 using System;
 using System.Collections.Generic;
@@ -7,6 +9,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net;
+using System.Net.WebSockets;
 using System.Reflection;
 using System.Text;
 using System.Threading;
@@ -22,6 +25,7 @@ namespace RpcOverHttp
     public interface IRpcServer
     {
         void Stop();
+        Task ProcessWebsocketRequest(IRpcWebSocketContext ctx);
         void ProcessRequest(IRpcHttpContext ctx);
         void Register<T>() where T : class;
         void Register<T>(T instance) where T : class;
@@ -84,15 +88,80 @@ namespace RpcOverHttp
                 this.ProcessRequestInternal(ctx);
             }
         }
-
-        private Task ProcessWebsocketRequest(IRpcWebSocketContext ctx)
+        private void OnWebSocketTaskCanceled(object state)
         {
-            return Task.Run(async () =>
-            {
-                var buffer = new ArraySegment<byte>(new byte[5]);
-                await ctx.WebSocket.ReceiveAsync(buffer, CancellationToken.None);
 
-            });
+        }
+
+        public async Task ProcessWebsocketRequest(IRpcWebSocketContext ctx)
+        {
+            WebSocket webSocket = ctx.WebSocket;
+            const int maxMessageSize = 1024;
+            var receivedDataBuffer = new ArraySegment<Byte>(new Byte[maxMessageSize]);
+            var cancellationToken = new CancellationToken();
+            cancellationToken.Register(OnWebSocketTaskCanceled, ctx);
+            var instanceIdStr = ctx.RequestUri.PathAndQuery.Substring(ctx.RequestUri.PathAndQuery.IndexOf('=') + 1);
+            Queue<RpcEvent> messages;
+            var instanceId = Guid.Parse(instanceIdStr);
+            if (!eventMessages.TryGetValue(instanceId, out messages))
+            {
+                eventMessages[instanceId] = messages = new Queue<RpcEvent>();
+            }
+            IRpcDataSerializer serializer;
+            if (!iocContainer.TryResolve(out serializer))
+            {
+                serializer = iocContainer.Resolve<IRpcDataSerializer>("default");
+            }
+            //检查WebSocket状态
+            while (webSocket.State == WebSocketState.Open)
+            {
+                try
+                {
+                    if (messages.Count > 0)
+                    {
+                        var msg = messages.Dequeue();
+                        using (var mssend = new MemoryStream())
+                        {
+                            //response = eventKey + args
+                            var keyBytes = BitConverter.GetBytes(msg.EventKey);
+                            mssend.Write(keyBytes, 0, keyBytes.Length);
+                            serializer.Serialize(mssend, msg.ArgumentTypes, msg.Arguments);
+                            await webSocket.SendAsync(new ArraySegment<byte>(mssend.ToArray()), WebSocketMessageType.Binary, true, cancellationToken);
+                        }
+                        //读取数据 
+                        WebSocketReceiveResult webSocketReceiveResult = await webSocket.ReceiveAsync(receivedDataBuffer, cancellationToken);
+
+                        if (webSocketReceiveResult.MessageType == WebSocketMessageType.Close)
+                        {
+                            await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, String.Empty, cancellationToken);
+                        }
+                        else
+                        {
+                            byte[] payloadData = receivedDataBuffer.Take(webSocketReceiveResult.Count).ToArray();
+                            using (var msrecv = new MemoryStream(payloadData))
+                            {
+                                IRpcEventHandleResult result = null;
+                                if (msg.ReturnType == typeof(void))
+                                {
+                                    result = new RpcEventHandleResultVoid();
+                                }
+                                else
+                                {
+                                    var resultType = typeof(RpcEventHandleResultGeneral<>).MakeGenericType(msg.ReturnType);
+                                    result = Activator.CreateInstance(resultType) as IRpcEventHandleResult;
+                                }
+                                object[] values = serializer.Deserialize(msrecv, new Type[] { result.GetType() });
+                                msg.SetResult(values[0] as IRpcEventHandleResult);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                    throw;
+                }
+            }
         }
 
         public void Stop()
@@ -171,6 +240,9 @@ namespace RpcOverHttp
             return encoding.Contains("gzip");
         }
 
+        SafeDictionary<Guid, object> instances = new SafeDictionary<Guid, object>();
+        SafeDictionary<Guid, CommonEventHandler> eventHandlers = new SafeDictionary<Guid, CommonEventHandler>();
+        internal SafeDictionary<Guid, Queue<RpcEvent>> eventMessages = new SafeDictionary<Guid, Queue<RpcEvent>>();
         private void ProcessNormalRequest(IRpcHttpContext ctx, Stream outputStream)
         {
             RpcError error = new RpcError("rpc server error.", null);
@@ -221,9 +293,14 @@ namespace RpcOverHttp
                                     serializer = iocContainer.Resolve<IRpcDataSerializer>("default");
                                 }
                                 object[] args = null;
+                                if (head.EventOp)
+                                {
+                                    FixupEventHandlerType(parmTypes);
+                                }
                                 try
                                 {
                                     args = serializer.Deserialize(ctx.Request.InputStream, parmTypes);
+
                                 }
                                 catch (Exception ex)
                                 {
@@ -233,9 +310,20 @@ namespace RpcOverHttp
                                 }
                                 if (!deserialize_body_error_obtained)
                                 {
-                                    //find the implimentation of the interface
-                                    object impl = iocContainer.Resolve(itfType);
+                                    object impl = null;
                                     object returnVal = null;
+
+                                    //find a instance
+                                    if (!this.instances.TryGetValue(head.InstanceId, out impl))
+                                    {
+                                        //resolve the implimentation of the interface
+                                        this.instances[head.InstanceId] = impl = iocContainer.Resolve(itfType);
+                                    }
+
+                                    if (impl != null)
+                                    {
+                                        this.instances[head.InstanceId] = impl;
+                                    }
 
                                     //exception handler and authroize handler
                                     var exceptionHandler = iocContainer.Resolve<IExceptionHandler>("default");
@@ -276,10 +364,34 @@ namespace RpcOverHttp
                                         else
                                         {
                                             //execute the call
+                                            if (head.EventOp)
+                                            {
+                                                var op = head.GetEventOp();
+                                                //create a method as the event proxy
+                                                EventInfo e = TypeHelper.GetEventInfo(itfType, op.EventName);
+                                                CommonEventHandler handler;
+                                                if (!eventHandlers.TryGetValue(head.InstanceId, out handler))
+                                                {
+                                                    eventHandlers[head.InstanceId] = handler = new CommonEventHandler(this, head.InstanceId);
+                                                }
+                                                var m_signature = e.EventHandlerType.GetMethod("Invoke");
+                                                var d = handler.CreateProxyDelegate(e.EventHandlerType, m_signature, (int)args[0]/*event subscription id*/);
 
-                                            MethodInfo implMethod = RpcMethodHelper.FindImplMethod(itfType, itfMethod, instanceType);
-                                            returnVal = RpcMethodHelper.Invoke(itfType, itfMethod, impl, implMethod, head.EventOp, head.Timeout, head.Token, args);
-
+                                                //event register/unregister
+                                                if (op.EventKind == RpcEventKind.Add)
+                                                {
+                                                    e.AddEventHandler(impl, d);
+                                                }
+                                                else
+                                                {
+                                                    e.RemoveEventHandler(impl, d);
+                                                }
+                                            }
+                                            else
+                                            {
+                                                MethodInfo implMethod = RpcMethodHelper.FindImplMethod(itfType, itfMethod, instanceType);
+                                                returnVal = RpcMethodHelper.Invoke(itfType, itfMethod, impl, implMethod, head.EventOp, head.Timeout, head.Token, args);
+                                            }
                                             //dispose resouces like stream
                                             foreach (IDisposable item in args.OfType<IDisposable>())
                                             {
@@ -382,6 +494,18 @@ namespace RpcOverHttp
                 ctx.Response.StatusDescription = "Internal Server Error";
             }
             ctx.WriteOutput(outputStream, error);
+        }
+
+        private void FixupEventHandlerType(Type[] parmTypes)
+        {
+            for (int i = 0; i < parmTypes.Length; i++)
+            {
+                parmTypes[i] = typeof(int);
+            }
+        }
+        private void FixupEventHandler(object[] args)
+        {
+
         }
 
         private void WriteMetadata(IRpcHttpContext ctx, Stream outputStream)

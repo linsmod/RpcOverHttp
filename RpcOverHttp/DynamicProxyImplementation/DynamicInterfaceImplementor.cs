@@ -18,7 +18,6 @@ namespace DynamicProxyImplementation
         }
 
         private ModuleBuilder moduleBuilder = null;
-
         private void InitTypeBuilder()
         {
             tryGetMemberMethodInfo = DynamicProxy.TryGetMemberMethodInfo;
@@ -111,7 +110,7 @@ namespace DynamicProxyImplementation
                     dynamicTypeEmitSyncRoot.Exit();
                 }
             }
-
+            
             return ret;
         }
 
@@ -289,9 +288,9 @@ namespace DynamicProxyImplementation
         {
             string eventName = eventInfo.Name;
             Type ehType = eventInfo.EventHandlerType;
-            LocalBuilder typeLb = ilGenerator.DeclareLocal(typeof(Type), true);
-            LocalBuilder objectLb = ilGenerator.DeclareLocal(typeof(object), true);
-            LocalBuilder retLb = ilGenerator.DeclareLocal(typeof(bool), true);
+            LocalBuilder typeLb = ilGenerator.DeclareLocal(typeof(Type), true);//loc_0
+            LocalBuilder objectLb = ilGenerator.DeclareLocal(typeof(object), true);//loc_1
+            LocalBuilder retLb = ilGenerator.DeclareLocal(typeof(bool), true);//loc_2
 
             //C#: Type.GetTypeFromHandle(interfaceType)
             EmitAndStoreGetTypeFromHandle(ilGenerator, eventInfo.DeclaringType, OpCodes.Stloc_0);
@@ -305,28 +304,27 @@ namespace DynamicProxyImplementation
             ilGenerator.Emit(OpCodes.Castclass, ehType);
             ilGenerator.Emit(OpCodes.Stfld, eventField);
 
-            //C#: DynamicProxy.TrySetMember(interfaceType, propertyName, eventHandler)
+            //C#: DynamicProxy.TrySetEvent(interfaceType, propertyName, eventHandler, add=true)
             ilGenerator.Emit(OpCodes.Ldarg_0);
             ilGenerator.Emit(OpCodes.Ldloc_0);
             ilGenerator.Emit(OpCodes.Ldstr, eventName);
-            ilGenerator.Emit(OpCodes.Ldarg_0);
-            ilGenerator.Emit(OpCodes.Ldfld, eventField);
+            ilGenerator.Emit(OpCodes.Ldarg_1); //ilGenerator.Emit(OpCodes.Ldarg_0);
+            ilGenerator.Emit(OpCodes.Castclass, ehType);//ilGenerator.Emit(OpCodes.Ldfld, eventField);
             ilGenerator.Emit(OpCodes.Ldc_I4, 1);
             ilGenerator.EmitCall(OpCodes.Callvirt, trySetEventMethodInfo, null);
             ilGenerator.Emit(OpCodes.Stloc_2);
 
             //C#: return
             ilGenerator.Emit(OpCodes.Ret);
-
         }
 
         private void EmitEventRemove(ILGenerator ilGenerator, EventInfo eventInfo, FieldBuilder eventField)
         {
             string eventName = eventInfo.Name;
             Type ehType = eventInfo.EventHandlerType;
-            LocalBuilder typeLb = ilGenerator.DeclareLocal(typeof(Type), true);
-            LocalBuilder objectLb = ilGenerator.DeclareLocal(typeof(object), true);
-            LocalBuilder retLb = ilGenerator.DeclareLocal(typeof(bool), true);
+            LocalBuilder typeLb = ilGenerator.DeclareLocal(typeof(Type), true);//loc_0
+            LocalBuilder objectLb = ilGenerator.DeclareLocal(typeof(object), true);//loc_1
+            LocalBuilder retLb = ilGenerator.DeclareLocal(typeof(bool), true);//loc_2
 
             //C#: Type.GetTypeFromHandle(interfaceType)
             EmitAndStoreGetTypeFromHandle(ilGenerator, eventInfo.DeclaringType, OpCodes.Stloc_0);
@@ -340,15 +338,16 @@ namespace DynamicProxyImplementation
             ilGenerator.Emit(OpCodes.Castclass, ehType);
             ilGenerator.Emit(OpCodes.Stfld, eventField);
 
-            //C#: DynamicProxy.TrySetMember(interfaceType, propertyName, eventHandler)
+            //C#: DynamicProxy.TrySetEvent(interfaceType, propertyName, eventHandler, add=true)
             ilGenerator.Emit(OpCodes.Ldarg_0);
             ilGenerator.Emit(OpCodes.Ldloc_0);
             ilGenerator.Emit(OpCodes.Ldstr, eventName);
-            ilGenerator.Emit(OpCodes.Ldarg_0);
-            ilGenerator.Emit(OpCodes.Ldfld, eventField);
+            ilGenerator.Emit(OpCodes.Ldarg_1); //ilGenerator.Emit(OpCodes.Ldarg_0);
+            ilGenerator.Emit(OpCodes.Castclass, ehType);//ilGenerator.Emit(OpCodes.Ldfld, eventField);
             ilGenerator.Emit(OpCodes.Ldc_I4, 0);
             ilGenerator.EmitCall(OpCodes.Callvirt, trySetEventMethodInfo, null);
             ilGenerator.Emit(OpCodes.Stloc_2);
+
 
             //C#: return
             ilGenerator.Emit(OpCodes.Ret);

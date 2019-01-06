@@ -23,6 +23,7 @@ namespace RpcOverHttp
         bool KeepAlive { get; }
         Stream InputStream { get; }
         NameValueCollection Headers { get; }
+        string UserAgent { get; }
     }
 
     public interface IRpcHttpResponse

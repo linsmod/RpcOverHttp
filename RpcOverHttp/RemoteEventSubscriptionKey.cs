@@ -9,23 +9,37 @@ namespace RpcOverHttp
 {
     internal class RemoteEventSubscriptionKey : IEqualityComparer<RemoteEventSubscriptionKey>
     {
-        public RemoteEventSubscriptionKey(MethodInfo interfaceMethod, MethodInfo eventHandlerMethod)
+        public RemoteEventSubscriptionKey(Type interfaceType, string eventName, MethodInfo handlerMethod)
         {
-            InterfaceMethod = interfaceMethod;
-            EventHandlerMethod = eventHandlerMethod;
+            this.InterfaceType = interfaceType;
+            this.EventName = eventName;
+            this.HandlerMethod = handlerMethod;
         }
 
-        public MethodInfo InterfaceMethod { get; set; }
-        public MethodInfo EventHandlerMethod { get; set; }
-
+        public Type InterfaceType { get; set; }
+        public string EventName { get; set; }
+        public MethodInfo HandlerMethod { get; set; }
         public bool Equals(RemoteEventSubscriptionKey x, RemoteEventSubscriptionKey y)
         {
-            return x.InterfaceMethod.Equals(y.InterfaceMethod) && x.EventHandlerMethod.Equals(y.EventHandlerMethod);
+            return x.InterfaceType.Equals(y.InterfaceType)
+                && x.EventName.Equals(y.EventName)
+                && x.HandlerMethod.Equals(y.HandlerMethod);
         }
 
         public int GetHashCode(RemoteEventSubscriptionKey obj)
         {
-            return (obj.InterfaceMethod.DeclaringType.FullName + obj.InterfaceMethod.MetadataToken + obj.EventHandlerMethod.DeclaringType.FullName + obj.EventHandlerMethod.MetadataToken).GetHashCode();
+            return (string.Join("|", obj.InterfaceType.Assembly.FullName,
+                obj.InterfaceType.FullName,
+                EventName,
+                HandlerMethod.DeclaringType.Assembly.FullName,
+                HandlerMethod.DeclaringType.FullName,
+                HandlerMethod.Name,
+                HandlerMethod.MetadataToken
+                )).GetHashCode();
+        }
+        public static implicit operator int(RemoteEventSubscriptionKey key)
+        {
+            return key.GetHashCode();
         }
     }
 }

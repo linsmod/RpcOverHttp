@@ -23,5 +23,12 @@ namespace RpcOverHttp.SelfHost
                 return ctx.WebSocket;
             }
         }
+        Uri IRpcWebSocketContext.RequestUri
+        {
+            get
+            {
+                return this.ctx.RequestUri;
+            }
+        }
     }
 }
