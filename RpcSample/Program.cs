@@ -14,6 +14,25 @@ namespace RpcSample
 {
     class Program
     {
+        private static int Sample_TestEventHandlerWithReturn(string arg)
+        {
+            throw new NotImplementedException();
+        }
+
+        private static void Sample_TestEventHandlerGeneric(object sender, object e)
+        {
+            throw new NotImplementedException();
+        }
+
+        private static void Sample_TestEventHandler1(object sender, EventArgs e)
+        {
+            throw new NotImplementedException();
+        }
+
+        private static void Sample_TestEventHandler(object sender, EventArgs e)
+        {
+            throw new NotImplementedException();
+        }
         static void Main(string[] args)
         {
             try
@@ -81,24 +100,6 @@ namespace RpcSample
             Console.ReadLine();
         }
 
-        private static int Sample_TestEventHandlerWithReturn(string arg)
-        {
-            throw new NotImplementedException();
-        }
-
-        private static void Sample_TestEventHandlerGeneric(object sender, object e)
-        {
-            throw new NotImplementedException();
-        }
-
-        private static void Sample_TestEventHandler1(object sender, EventArgs e)
-        {
-            throw new NotImplementedException();
-        }
-
-        private static void Sample_TestEventHandler(object sender, EventArgs e)
-        {
-            throw new NotImplementedException();
-        }
+        
     }
 }

@@ -175,9 +175,9 @@ namespace RpcOverHttp
             this.Result = result;
             waitHandle.Set();
         }
-        internal IRpcEventHandleResult WaitResult()
+        internal IRpcEventHandleResult WaitResult(int millisecondsTimeout)
         {
-            waitHandle.WaitOne();
+            waitHandle.WaitOne(millisecondsTimeout);
             return this.Result;
         }
     }

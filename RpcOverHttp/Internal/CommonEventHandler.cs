@@ -150,7 +150,7 @@ namespace RpcOverHttp.Internal
             Queue<RpcEvent> queue;
             server.eventMessages.TryGetValue(this.InstanceId, out queue);
             queue.Enqueue(rpcEvent);
-            var result = rpcEvent.WaitResult();
+            var result = rpcEvent.WaitResult(10 * 1000);
             if (result.Error != null)
             {
                 throw new RpcException("the client failed to handle event {0}", result.Error, RpcErrorLocation.ClientEventHandler);
