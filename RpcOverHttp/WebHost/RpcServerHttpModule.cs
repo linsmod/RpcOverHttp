@@ -29,7 +29,7 @@ namespace RpcOverHttp.WebHost
             }
         }
         public abstract void InitRpcServer(IRpcServer server);
-        public bool IsReusable => false;
+        public bool IsReusable => true;
 
         public void ProcessRequest(HttpContext context)
         {
@@ -46,63 +46,36 @@ namespace RpcOverHttp.WebHost
             }
         }
     }
-    //public abstract class RpcServerHttpModule : IHttpModule
-    //{
-    //    static IRpcServer server;
-    //    static object lockObj = new object();
-    //    public void Dispose()
-    //    {
-    //    }
+    internal class RpcServerHttpHandlerInternal : RpcServerHttpHandler
+    {
+        private RpcServerHttpModule module;
 
-    //    public void Init(HttpApplication context)
-    //    {
-    //        if (server == null)
-    //        {
-    //            lock (lockObj)
-    //            {
-    //                if (server == null)
-    //                {
-    //                    server = new RpcServer();
-    //                    this.InitRpcServer(server);
-    //                    (server as RpcServer).Start();
-    //                }
-    //            }
-    //        }
-    //        //context.BeginRequest += Context_BeginRequest;
-    //        context.MapRequestHandler += Context_MapRequestHandler;
-    //        context.
-    //    }
+        public RpcServerHttpHandlerInternal(RpcServerHttpModule module)
+        {
+            this.module = module;
+        }
+        public override void InitRpcServer(IRpcServer server)
+        {
+            module.InitRpcServer(server);
+        }
+    }
+    public abstract class RpcServerHttpModule : IHttpModule
+    {
+        public void Dispose()
+        {
+        }
 
-    //    private void Context_MapRequestHandler(object sender, EventArgs e)
-    //    {
-    //        var application = sender as HttpApplication;
-    //        IRpcHttpContext ctx = new WebHost.SystemWebHttpContext(application.Context);
-    //        if (!string.IsNullOrEmpty(ctx.Request.UserAgent)
-    //            && ctx.Request.UserAgent.IndexOf("RpcOverHttp", StringComparison.OrdinalIgnoreCase) != -1)
-    //        {
-    //            application.Response.TrySkipIisCustomErrors = true;
-    //            server.ProcessRequest(ctx);
-    //            application.CompleteRequest();
-    //        }
-    //        else if (ctx.IsWebSocketRequest)
-    //        {
-    //            ctx.AcceptWebSocket(server.ProcessWebsocketRequest);
-    //        }
-    //        //else if (ctx.Request.Headers["Connection"] != null
-    //        //    && ctx.Request.Headers["Connection"].IndexOf("Upgrade", StringComparison.OrdinalIgnoreCase) != -1
-    //        //    && ctx.Request.Headers["Upgrade"] != null
-    //        //    && ctx.Request.Headers["Upgrade"].IndexOf("WebSocket", StringComparison.OrdinalIgnoreCase) != -1
-    //        //    )
-    //        //{
-    //        //    ctx.Response.StatusCode = 101; // to make iis websocket module handle ws shakehands
-    //        //    ctx.Response.Flush();
-    //        //}
-    //    }
+        public void Init(HttpApplication context)
+        {
+            context.MapRequestHandler += Context_MapRequestHandler;
+        }
 
-    //    public abstract void InitRpcServer(IRpcServer server);
+        private void Context_MapRequestHandler(object sender, EventArgs e)
+        {
+            var application = sender as HttpApplication;
+            application.Context.RemapHandler(new RpcServerHttpHandlerInternal(this));
+        }
 
-    //    private void Context_BeginRequest(object sender, EventArgs e)
-    //    {
-    //    }
-    //}
+        public abstract void InitRpcServer(IRpcServer server);
+    }
 }
