@@ -3,6 +3,19 @@ a .NET interface based rpc framework, process command using http protocol under 
 the interface/implementation and its method is like the asp.net mvc controller+action style but more simple to client use.
 
 
+
+## features.
+- interface based. makes you **focus on the business**.
+- **async support** by providing Task/Task&lt;T&gt; as a method return type.
+- provide **ioc container** both in server and client.
+- control **authroization, serialization** by your self or framework default.
+- serialize data using the built-in protobuf serializer and serialize rpc header using json serializer as default.
+- server **exception wrapping**, client will throw a RpcException when received a server side error.
+- support self host and **iis intergration**.
+- **.net event** supported (required Windows8 and Server2012 when using iis-intergration). 
+- support https, provide https certificate auto generation when self host mode.
+- **auto dispose** the method arguments or return value after user code when using Stream or other objects inherited from Idisposible.
+
 ## How to use?
 ### 1)define the interface in MyInterface.dll
 ```
@@ -152,19 +165,18 @@ static void Main(string[] args)
 
 ```
 
-## advanced or what i have remembered.
+## argument types supported
+- .NET primitive types and String, Array, List&lt;T&gt;, Enum
+- Stream
+- classes that only using the types mentioned above.
 
-- like asp.net mvc. using AuthorizeAttribute/AllowAnonymousAttribute to control your rpc service access
-- using Task/Task&lt;T&gt; as the return type to do async stuff.
-- default data serializer is a built-in protobuf serializer(ProtoBufRpcDataSerializer),to override the defaults, define your own serializer and register it by using the ioc registration method both in server and client, you should hand the stream type carefully when serialize/deserialize in your own implementation.
-- built-in a implementation of IExceptionHandler so do IAuthorizeHandler,you can define your own implementation and register it by using the ioc registration method in server to override the defaults
-- the client request timeout is 120s. so do the Task/Task&lt;T&gt; waiting timeout at the server side.
-- the request/response is standard http request, fiddler can review the communication
-- requet metadata is a route info about how to find the implementation method. it will be serialized using IRpcHeadSerializer(JsonRpcHeadSerializer as default), then adds to http header, the header name is "meta"
-- the http body both request and response is serialize/deserialize by using IRpcDataSerializer(ProtoBufRpcDataSerializer) as default
+## limitations
+- see #argument types supported
+- nested Task as return type is not supported.
 
 ## https
 yes, it supports https with a simple way.
+self host mode:
 - at server side, if you use a https url, when server starting, framework will auto generate a cert file pair(private key will install to system(LocalMachine->Personal) and the public key is exported as a cert file under working dir for client use)
 - at client side, find the exported cert file by server and feed it to the initialize method.
 ```
@@ -172,9 +184,13 @@ public static RpcClient Initialize(string url, string cerFilePath, WebProxy prox
 ```
 to regenerate cert file pair, delete the cert from system(LocalMachine->Personal). the cert name is "RpcOverHttp"
 
+iis-intergration mode:
+- at server side, select the cert file by using iis manager as usual.
+- at client side, when ssl server certificate checking error, RpcClient.ServerCertificateValidationCallback will be called. just handle it like using HttpWebReqeust.ServerCertificateValidationCallback.
+
 ## iis intergration since version 3.3.0
 we provided a http module for host rpc server on iis since version 3.3.0. 
-selfhost style:
+selfhost sample:
 ```
 	public class Program
     {
@@ -190,7 +206,7 @@ selfhost style:
 
 ```
 
-and the iis module style:
+and the iis module sample:
 
 ```
 	//dll name is RpcHost, namespace is RpcHost
@@ -203,7 +219,7 @@ and the iis module style:
     }
 ```
 
-*you should build your server project as a dll instead of an application(exe).*
+**you should build your server project as a dll instead of an application(exe).** when using iis-intergration
 
 then copy all the output dlls into site’s bin folder(create one if non exists).
 
@@ -229,6 +245,3 @@ then register the http module in web.config
 </configuration>
 
 ```
-
-when edit the client side, two things:
-1) check the url. 2) optionally use *client.ServerCertificateValidationCallback* handle ssl certificate errors if host using https.
