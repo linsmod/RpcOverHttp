@@ -14,7 +14,7 @@ the interface/implementation and its method is like the asp.net mvc controller+a
 - support self host and **iis intergration**.
 - **.net event** supported (required Windows8 and Server2012 when using iis-intergration). 
 - support https, provide https certificate auto generation when self host mode.
-- **auto dispose** the method arguments or return value after user code when using Stream or other objects inherited from Idisposible.
+- **auto dispose** the method arguments and return value after user code when using Stream or other objects inherited from Idisposible.
 
 ## How to use?
 ### 1)define the interface in MyInterface.dll
