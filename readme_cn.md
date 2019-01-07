@@ -1,4 +1,4 @@
-Selet language: **中文** | [ENGLISH](readme.md)
+选择语言: **中文** | [ENGLISH](readme.md)
 
 ### RpcOverHttp
 一个基于.NET接口的rpc框架，使用http协议。
