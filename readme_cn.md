@@ -9,12 +9,12 @@
 ## 特性
 - 基于接口, 让你**专注于业务**。
 -  **异步支持**, 通过提供Task/Task&lt; T&gt; 作为方法返回类型。
-- **依赖注入**, 在服务器和客户端提供ioc容器的类型和对象注册接口。
-- 通过你自己或框架内置的默认的实现控制** 调用认证和数据序列化**。
+- **依赖注入**, 在服务器和客户端封装ioc容器，提供类型和对象注册的方法。
+- 通过你自己或框架内置的默认的实现控制**调用认证**，**数据序列化**。
 - 使用内置的protobuf serializer序列化请求参数，使用json serializer序列化请求元数据（RpcHead, 包含接口方法路由信息）。
 - 使用服务器端**异常包装**，客户端在收到服务器端错误时将抛出RpcException。
-- 支持self host 和** iis集成**。
--  **支持.NET事件 **，由websocket驱动（使用iis-集成时要求Windows8，Server2012，及以上）。 
+- 支持self host 和**iis集成**。
+-  **支持.NET事件**，由websocket驱动（使用iis-集成时要求Windows8，Server2012，及以上）。 
 - 支持https，在自托管模式下自动生成https自签名证书。
 -  **对象自动释放** 当使用Stream或从IDisposible继承的其他对象，框架将自动调用IDisposible.Dispose。
 
