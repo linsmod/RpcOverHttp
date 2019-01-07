@@ -1,4 +1,6 @@
-﻿### RpcOverHttp
+[中文介绍](readme_cn.md)
+
+### RpcOverHttp
 a .NET interface based rpc framework, process command using http protocol under the hood.
 the interface/implementation and its method is like the asp.net mvc controller+action style but more simple to client use.
 
