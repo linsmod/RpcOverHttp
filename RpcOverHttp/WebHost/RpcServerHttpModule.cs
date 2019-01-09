@@ -3,20 +3,17 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 
 namespace RpcOverHttp.WebHost
 {
-    public abstract class RpcServerHttpModule : IHttpModule
+    public abstract class RpcServerHttpHandler : IHttpHandler
     {
         static IRpcServer server;
         static object lockObj = new object();
-        public void Dispose()
-        {
-        }
-
-        public void Init(HttpApplication context)
+        public RpcServerHttpHandler()
         {
             if (server == null)
             {
@@ -30,21 +27,55 @@ namespace RpcOverHttp.WebHost
                     }
                 }
             }
-            context.BeginRequest += Context_BeginRequest;
         }
-
         public abstract void InitRpcServer(IRpcServer server);
+        public bool IsReusable => true;
 
-        private void Context_BeginRequest(object sender, EventArgs e)
+        public void ProcessRequest(HttpContext context)
         {
-            var ctx = sender as HttpApplication;
+            IRpcHttpContext ctx = new WebHost.SystemWebHttpContext(context);
             if (!string.IsNullOrEmpty(ctx.Request.UserAgent)
                 && ctx.Request.UserAgent.IndexOf("RpcOverHttp", StringComparison.OrdinalIgnoreCase) != -1)
             {
-                ctx.Response.TrySkipIisCustomErrors = true;
-                server.ProcessRequest(new WebHost.SystemWebHttpContext(ctx));
-                ctx.CompleteRequest();
+                context.Response.TrySkipIisCustomErrors = true;
+                server.ProcessRequest(ctx);
+            }
+            else if (ctx.IsWebSocketRequest)
+            {
+                ctx.AcceptWebSocket(server.ProcessWebsocketRequest);
             }
         }
+    }
+    internal class RpcServerHttpHandlerInternal : RpcServerHttpHandler
+    {
+        private RpcServerHttpModule module;
+
+        public RpcServerHttpHandlerInternal(RpcServerHttpModule module)
+        {
+            this.module = module;
+        }
+        public override void InitRpcServer(IRpcServer server)
+        {
+            module.InitRpcServer(server);
+        }
+    }
+    public abstract class RpcServerHttpModule : IHttpModule
+    {
+        public void Dispose()
+        {
+        }
+
+        public void Init(HttpApplication context)
+        {
+            context.MapRequestHandler += Context_MapRequestHandler;
+        }
+
+        private void Context_MapRequestHandler(object sender, EventArgs e)
+        {
+            var application = sender as HttpApplication;
+            application.Context.RemapHandler(new RpcServerHttpHandlerInternal(this));
+        }
+
+        public abstract void InitRpcServer(IRpcServer server);
     }
 }

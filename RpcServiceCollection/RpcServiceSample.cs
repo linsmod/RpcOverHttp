@@ -15,6 +15,9 @@ namespace RpcServiceCollection
         public RpcServiceSample()
         {
         }
+        public event Func<string, int> TestEventHandlerWithReturn;
+        public event EventHandler TestEventHandler;
+        public event EventHandler<object> TestEventHandlerGeneric;
 
         public override RpcIdentity Authroize(string token)
         {
@@ -23,6 +26,11 @@ namespace RpcServiceCollection
 
         public string GetUserName()
         {
+            if (TestEventHandlerWithReturn != null)
+            {
+                var num = TestEventHandlerWithReturn.Invoke("hello world");
+                Console.WriteLine("TestEventHandlerWithReturn remote handle ok");
+            }
             return this.User.Identity.Name;
         }
 

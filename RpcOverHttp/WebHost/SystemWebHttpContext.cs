@@ -7,16 +7,50 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
+using System.Web.WebSockets;
 
 namespace RpcOverHttp.WebHost
 {
     internal class SystemWebHttpContext : IRpcHttpContext
     {
-        private HttpApplication ctx;
+        private HttpContext ctx;
 
-        public SystemWebHttpContext(HttpApplication ctx)
+        public SystemWebHttpContext(HttpContext ctx)
         {
             this.ctx = ctx;
+        }
+
+        Func<Func<AspNetWebSocketContext, Task>, AspNetWebSocketContext> x;
+
+        public void AcceptWebSocket(Func<IRpcWebSocketContext, Task> userFunc)
+        {
+            ctx.Items["wsUserFunc"] = userFunc;
+            ctx.AcceptWebSocketRequest(ProcessRequest);
+        }
+
+        public bool IsWebSocketRequest
+        {
+            get
+            {
+                return ctx.IsWebSocketRequest;
+            }
+        }
+
+        private async Task ProcessRequest(AspNetWebSocketContext ctx)
+        {
+            var userFunc = ctx.Items["wsUserFunc"] as Func<IRpcWebSocketContext, Task>;
+            await userFunc(new SystemWebWebSocketContext(ctx));
+        }
+
+        public class AspNetWebSocketContextWrapper : AspNetWebSocketContext
+        {
+            private Func<IRpcWebSocketContext> wsctxRetriver;
+
+            public AspNetWebSocketContextWrapper(Func<IRpcWebSocketContext> wsctxRetriver)
+            {
+                this.wsctxRetriver = wsctxRetriver;
+            }
+
         }
 
         IRpcHttpRequest IRpcHttpContext.Request
@@ -81,6 +115,13 @@ namespace RpcOverHttp.WebHost
             get
             {
                 return request.Url;
+            }
+        }
+        string IRpcHttpRequest.UserAgent
+        {
+            get
+            {
+                return request.UserAgent;
             }
         }
     }

@@ -13,6 +13,8 @@ namespace RpcOverHttp
     {
         IRpcHttpRequest Request { get; }
         IRpcHttpResponse Response { get; }
+        void AcceptWebSocket(Func<IRpcWebSocketContext, Task> userFunc);
+        bool IsWebSocketRequest { get; }
     }
     public interface IRpcHttpRequest
     {
@@ -21,6 +23,7 @@ namespace RpcOverHttp
         bool KeepAlive { get; }
         Stream InputStream { get; }
         NameValueCollection Headers { get; }
+        string UserAgent { get; }
     }
 
     public interface IRpcHttpResponse

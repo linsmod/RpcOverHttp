@@ -34,6 +34,7 @@ namespace RpcOverHttp
     /// <summary>
     /// 服务端发送给客户端的异常信息
     /// </summary>
+    [ProtoBuf.ProtoContract]
     public class RpcError
     {
         public RpcError() { }
@@ -42,7 +43,9 @@ namespace RpcOverHttp
             this.Message = message;
             this.StackTrace = stackTrace;
         }
+        [ProtoBuf.ProtoMember(1)]
         public string Message { get; set; }
+        [ProtoBuf.ProtoMember(2)]
         public string StackTrace { get; set; }
         public static RpcError FromException(Exception ex)
         {
@@ -55,7 +58,11 @@ namespace RpcOverHttp
     }
     public enum RpcErrorLocation
     {
-        Local,
-        Remote
+        Client,
+        Server,
+        /// <summary>
+        /// when process a event handler call from server to client using websocket
+        /// </summary>
+        ClientEventHandler
     }
 }

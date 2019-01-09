@@ -10,6 +10,7 @@ namespace DynamicProxyImplementation
         private static object dummyOut;
         public static MethodInfo TryGetMemberMethodInfo = ExpressionHelper.GetMethodCallExpressionMethodInfo<DynamicProxy>(o => o.TryGetMember(null, null, out dummyOut));
         public static MethodInfo TrySetMemberMethodInfo = ExpressionHelper.GetMethodCallExpressionMethodInfo<DynamicProxy>(o => o.TrySetMemberInternal(null, null, null));
+        public static MethodInfo TrySetEventMethodInfo = ExpressionHelper.GetMethodCallExpressionMethodInfo<DynamicProxy>(o => o.TrySetEvent(null, null, null, true));
         public static MethodInfo TryInvokeMemberMethodInfo = ExpressionHelper.GetMethodCallExpressionMethodInfo<DynamicProxy>(o => o.TryInvokeMember(null, 0, false, null, out dummyOut));
 
         protected DynamicProxy()
@@ -22,20 +23,15 @@ namespace DynamicProxyImplementation
 
         protected abstract bool TryGetMember(Type interfaceType, string name, out object result);
 
-        protected abstract bool TrySetEvent(Type interfaceType, string name, object value);
+        protected abstract bool TrySetEvent(Type interfaceType, string name, object value, bool add);
+        protected bool TrySetEventInternal(Type interfaceType, string name, object value, bool add)
+        {
+            return TrySetEvent(interfaceType, name, value, add);
+        }
 
         protected bool TrySetMemberInternal(Type interfaceType, string name, object value)
         {
-            bool ret;
-            if (TypeHelper.HasEvent(interfaceType, name))
-            {
-                ret = TrySetEvent(interfaceType, name, value);
-            }
-            else
-            {
-                ret = TrySetMember(interfaceType, name, value);
-            }
-            return ret;
+            return TrySetMember(interfaceType, name, value);
         }
 
         protected virtual void Dispose(bool disposing)
@@ -66,7 +62,7 @@ namespace DynamicProxyImplementation
             throw new NotImplementedException();
         }
 
-        protected override bool TrySetEvent(Type interfaceType, string name, object value)
+        protected override bool TrySetEvent(Type interfaceType, string name, object value, bool add)
         {
             throw new NotImplementedException();
         }

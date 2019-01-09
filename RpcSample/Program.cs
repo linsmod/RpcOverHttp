@@ -14,14 +14,36 @@ namespace RpcSample
 {
     class Program
     {
+        private static int Sample_TestEventHandlerWithReturn(string arg)
+        {
+            throw new NotImplementedException();
+        }
+
+        private static void Sample_TestEventHandlerGeneric(object sender, object e)
+        {
+            throw new NotImplementedException();
+        }
+
+        private static void Sample_TestEventHandler1(object sender, EventArgs e)
+        {
+            throw new NotImplementedException();
+        }
+
+        private static void Sample_TestEventHandler(object sender, EventArgs e)
+        {
+            throw new NotImplementedException();
+        }
         static void Main(string[] args)
         {
             try
             {
-                //var client = RpcClient.Initialize("http://127.0.0.1/", "../../../RpcHost/bin/Debug/RpcOverHttp.cer");
-                var client = RpcClient.Initialize("https://localhost:8443/", "../../../RpcHost/bin/Debug/RpcOverHttp.cer");
+                var client = RpcClient.Initialize("http://127.0.0.1:8970/");
+                //var client = RpcClient.Initialize("https://localhost:8443/", "../../../RpcHost/bin/Debug/RpcOverHttp.cer");
                 client.ServerCertificateValidationCallback = (a, b, c, d) => true;
                 var sample = client.Rpc<IRpcServiceSample>();
+                sample.TestEventHandlerWithReturn += Sample_TestEventHandlerWithReturn;
+                sample.TestEventHandlerGeneric += Sample_TestEventHandlerGeneric;
+                sample.TestEventHandler -= Sample_TestEventHandler;
                 var username = sample.GetUserName();
                 Debug.Assert(username.Equals("Anonymous"));
                 Console.WriteLine("GetUserName ok");
@@ -77,5 +99,7 @@ namespace RpcSample
             }
             Console.ReadLine();
         }
+
+        
     }
 }

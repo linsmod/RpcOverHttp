@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace RpcOverHttp
@@ -20,6 +21,12 @@ namespace RpcOverHttp
         /// 请求ID
         /// </summary>
         public int Id { get; set; }
+
+        /// <summary>
+        /// 通过instanceId查找实例，找不到就创建一个
+        /// </summary>
+        public Guid InstanceId { get; set; }
+
         /// <summary>
         /// 调用key
         /// </summary>
@@ -54,6 +61,137 @@ namespace RpcOverHttp
         /// 客户端超时设置，服务端根据该设置值调整Task类型任务的执行时间
         /// </summary>
         public int Timeout { get; set; }
+
+        internal RpcEventOp GetEventOp()
+        {
+            if (!this.EventOp)
+            {
+                throw new NotSupportedException("request must be a event operation.");
+            }
+            var p = this.MethodName.Split(new char[] { '_' }, 2);
+            return new RpcEventOp
+            {
+                EventKind = p[0] == "add" ? RpcEventKind.Add : RpcEventKind.Remove,
+                EventName = p[1]
+            };
+        }
+    }
+
+    /// <summary>
+    /// represent the result to the client handler method for a event handler
+    /// </summary>
+    [ProtoBuf.ProtoContract]
+    internal class RpcEventHandleResultGeneral<T> : IRpcEventHandleResult
+    {
+        [ProtoBuf.ProtoMember(1)]
+        public RpcError Error { get; set; }
+        [ProtoBuf.ProtoMember(2)]
+        public T Value { get; set; }
+        [ProtoBuf.ProtoIgnore]
+        RpcError IRpcEventHandleResult.Error
+        {
+            get
+            {
+                return this.Error;
+            }
+            set
+            {
+                this.Error = value;
+            }
+        }
+        [ProtoBuf.ProtoIgnore]
+        object IRpcEventHandleResult.Value
+        {
+            get
+            {
+                return this.Value;
+            }
+            set
+            {
+                this.Value = (T)value;
+            }
+        }
+    }
+
+    internal interface IRpcEventHandleResult
+    {
+        RpcError Error { get; set; }
+        object Value { get; set; }
+    }
+    [ProtoBuf.ProtoContract]
+    internal class RpcEventHandleResultVoid : IRpcEventHandleResult
+    {
+        [ProtoBuf.ProtoMember(1)]
+        public RpcError Error { get; set; }
+        [ProtoBuf.ProtoIgnore]
+        RpcError IRpcEventHandleResult.Error
+        {
+            get
+            {
+                return this.Error;
+            }
+            set
+            {
+                this.Error = value;
+            }
+        }
+        [ProtoBuf.ProtoIgnore]
+        object IRpcEventHandleResult.Value
+        {
+            get
+            {
+                throw new NotSupportedException();
+            }
+            set
+            {
+                if (value != null)
+                {
+                    throw new NotSupportedException();
+                }
+            }
+        }
+    }
+
+    internal class RpcEventData
+    {
+        public int EventKey { get; internal set; }
+        public object[] Arguments { get; internal set; }
+    }
+
+    /// <summary>
+    /// which is a event will send to client to handle.
+    /// </summary>
+    internal class RpcEvent
+    {
+        public Type[] ArgumentTypes { get; internal set; }
+        public object[] Arguments { get; internal set; }
+        public Type ReturnType { get; internal set; }
+        AutoResetEvent waitHandle = new AutoResetEvent(false);
+        IRpcEventHandleResult Result { get; set; }
+        public int EventKey { get; internal set; }
+
+        internal void SetResult(IRpcEventHandleResult result)
+        {
+            this.Result = result;
+            waitHandle.Set();
+        }
+        internal IRpcEventHandleResult WaitResult(int millisecondsTimeout)
+        {
+            waitHandle.WaitOne(millisecondsTimeout);
+            return this.Result;
+        }
+    }
+
+    internal class RpcEventOp
+    {
+        internal RpcEventKind EventKind { get; set; }
+        internal string EventName { get; set; }
+
+    }
+    internal enum RpcEventKind
+    {
+        Add,
+        Remove
     }
 
     internal class RpcRequest : RpcHead
@@ -61,6 +199,7 @@ namespace RpcOverHttp
         /// <summary>
         /// 参数
         /// </summary>
+        [JsonIgnore]
         public object[] Arguments { get; set; }
     }
 }

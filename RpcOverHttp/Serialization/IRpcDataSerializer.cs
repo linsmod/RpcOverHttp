@@ -31,15 +31,7 @@ namespace RpcOverHttp.Serialization
 
         public string Serialize(RpcHead head)
         {
-            var token = new JObject();
-            token.Add(nameof(RpcHead.Namespace), head.Namespace);
-            token.Add(nameof(RpcHead.TypeName), head.TypeName);
-            token.Add(nameof(RpcHead.MethodName), head.MethodName);
-            token.Add(nameof(RpcHead.MethodMDToken), head.MethodMDToken);
-            token.Add(nameof(RpcHead.Token), head.Token);
-            token.Add(nameof(RpcHead.Id), head.Id);
-            token.Add(nameof(RpcHead.Timeout), head.Timeout);
-            return token.ToString(Formatting.None);
+            return JObject.FromObject(head).ToString(Formatting.None);
         }
     }
 
@@ -109,7 +101,8 @@ namespace RpcOverHttp.Serialization
                     int loop = 0;
                     while ((length = streamArg.Read(buff, 0, buff.Length)) > 0)
                     {
-                        if (length < buff.Length) {
+                        if (length < buff.Length)
+                        {
                             Array.Resize(ref buff, length);
                         }
                         RuntimeTypeModel.Default.SerializeWithLengthPrefix(writeStream, buff, typeof(byte[]), ProtoBuf.PrefixStyle.Base128, args.Length + i * loop);
@@ -119,7 +112,19 @@ namespace RpcOverHttp.Serialization
                     RuntimeTypeModel.Default.SerializeWithLengthPrefix(writeStream, new byte[0], typeof(byte[]), ProtoBuf.PrefixStyle.Base128, args.Length + i * loop);
                 }
                 else
-                    RuntimeTypeModel.Default.SerializeWithLengthPrefix(writeStream, item, itemType, ProtoBuf.PrefixStyle.Base128, i);
+                {
+                    try
+                    {
+                        if (item != null)
+                        {
+                            RuntimeTypeModel.Default.SerializeWithLengthPrefix(writeStream, item, itemType, ProtoBuf.PrefixStyle.Base128, i);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        throw;
+                    }
+                }
             }
         }
     }
