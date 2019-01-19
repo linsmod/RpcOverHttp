@@ -15,27 +15,43 @@ namespace RpcServiceCollection
         public RpcServiceSample()
         {
         }
-        public event Func<string, int> TestEventHandlerWithReturn;
-        public event EventHandler TestEventHandler;
-        public event EventHandler<object> TestEventHandlerGeneric;
+
+        public event Func<string, int> SampleFuncEvent;
+        public event EventHandler SimpleEvent;
+        public event EventHandler<string> SampleActionEvent;
 
         public override RpcIdentity Authroize(string token)
         {
             return base.Authroize(token);
         }
 
+        public void TestRemoteEventHandler()
+        {
+            if (SimpleEvent != null)
+            {
+                SimpleEvent(this, EventArgs.Empty);
+                Console.WriteLine("test SimpleEvent remote handle ok");
+            }
+            if (SampleFuncEvent != null)
+            {
+                var num = SampleFuncEvent.Invoke("hello world");
+                Console.WriteLine("test SampleFuncEvent remote handle ok");
+            }
+            if (SampleActionEvent != null)
+            {
+                SampleActionEvent(this, "hello client.");
+                Console.WriteLine("test SampleActionEvent remote handle ok");
+            }
+        }
+
         public string GetUserName()
         {
-            if (TestEventHandlerWithReturn != null)
-            {
-                var num = TestEventHandlerWithReturn.Invoke("hello world");
-                Console.WriteLine("TestEventHandlerWithReturn remote handle ok");
-            }
             return this.User.Identity.Name;
         }
 
         public bool IsUserAuthenticated()
         {
+
             return this.User.Identity.IsAuthenticated;
         }
 

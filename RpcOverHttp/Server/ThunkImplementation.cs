@@ -17,9 +17,9 @@ namespace RpcOverHttp.Server
             return factory.CreateDynamicProxy<TInterface>(this, instance);
         }
 
-        public object GetProxy(Type interfaceType, object instance, RpcServer server)
+        public object GetProxy(Type interfaceType, object instance, Guid instanceId, RpcServer server)
         {
-            return factory.CreateDynamicProxy(interfaceType, this, instance, server);
+            return factory.CreateDynamicProxy(interfaceType, this, instance, instanceId, server);
         }
     }
     internal class ThunkImplementation : DynamicProxy, IRpcService
@@ -27,6 +27,7 @@ namespace RpcOverHttp.Server
         private ThunkImplementationFactory factory;
         private object instance;
         private RpcServer server;
+        private Guid instanceId;
 
         RpcPrincipal IRpcService.User
         {
@@ -41,11 +42,12 @@ namespace RpcOverHttp.Server
             }
         }
 
-        public ThunkImplementation(ThunkImplementationFactory factory, object instance, RpcServer server)
+        public ThunkImplementation(ThunkImplementationFactory factory, object instance, Guid instanceId, RpcServer server)
         {
             this.factory = factory;
             this.instance = instance;
             this.server = server;
+            this.instanceId = instanceId;
         }
         protected override bool TryGetMember(Type interfaceType, string name, out object result)
         {
@@ -82,13 +84,20 @@ namespace RpcOverHttp.Server
             rpcEvent.Arguments = args;
             rpcEvent.ArgumentTypes = method.GetParameters().Select(x => x.ParameterType).ToArray();
             rpcEvent.ReturnType = method.ReturnType;
+
+            //control only invoking the matched event hander registeration
+            if (RpcHead.Current.InstanceId != this.instanceId)
+            {
+                result = null;
+                return false;
+            }
             if (!EventHub.hanlderMap.TryGetValue(RpcHead.Current.InstanceId + "." + name, out EventHubItem item))
             {
                 throw new Exception("can not found the client handler.");
             }
             rpcEvent.handlerId = item.callbackIds[0];
             //rpcEvent.handlerId = item.callbackIds[0];
-            Queue<RpcEvent> queue;
+            BlockingQueue<RpcEvent> queue;
             server.eventMessages.TryGetValue(RpcHead.Current.InstanceId, out queue);
 
             queue.Enqueue(rpcEvent);
@@ -101,7 +110,14 @@ namespace RpcOverHttp.Server
             else
             {
                 Console.WriteLine("client feed is a valid result.");
-                result = invokeResult.Value;
+                if (method.ReturnType == typeof(void))
+                {
+                    result = null;
+                }
+                else
+                {
+                    result = invokeResult.Value;
+                }
                 return true;
             }
         }
@@ -126,7 +142,8 @@ namespace RpcOverHttp.Server
             {
                 return service.HandleException(head, ex);
             }
-            else {
+            else
+            {
                 return server.ExceptionHandler.HandleException(head, ex);
             }
         }

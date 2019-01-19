@@ -104,12 +104,12 @@ namespace RpcOverHttp
             var cancellationToken = new CancellationToken();
             cancellationToken.Register(OnWebSocketTaskCanceled, ctx);
             var instanceIdStr = ctx.RequestUri.PathAndQuery.Substring(ctx.RequestUri.PathAndQuery.IndexOf('=') + 1);
-            Queue<RpcEvent> messages;
+            BlockingQueue<RpcEvent> messages;
             var instanceId = Guid.Parse(instanceIdStr);
 
             if (!eventMessages.TryGetValue(instanceId, out messages))
             {
-                eventMessages[instanceId] = messages = new Queue<RpcEvent>();
+                eventMessages[instanceId] = messages = new BlockingQueue<RpcEvent>(cancellationToken);
             }
             Console.WriteLine("ws client connected, rpc service instance id is {0}.", instanceId);
             IRpcDataSerializer serializer;
@@ -122,44 +122,47 @@ namespace RpcOverHttp
             {
                 try
                 {
-                    if (messages.Count > 0)
+                    var msg = messages.Dequeue();
+                    if (msg == null)
                     {
-                        var msg = messages.Dequeue();
-                        using (var mssend = new MemoryStream())
+                        await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "", cancellationToken);
+                        return;
+                    }
+                    using (var mssend = new MemoryStream())
+                    {
+                        //response = eventKey + args
+                        var keyBytes = BitConverter.GetBytes(msg.handlerId);
+                        mssend.Write(keyBytes, 0, keyBytes.Length);
+                        this.FixupEventHandlerSender(msg);
+                        serializer.Serialize(mssend, msg.ArgumentTypes, msg.Arguments);
+                        Console.WriteLine("rpc invoking client through websocket");
+                        await webSocket.SendAsync(new ArraySegment<byte>(mssend.ToArray()), WebSocketMessageType.Binary, true, cancellationToken);
+                    }
+                    //读取数据 
+                    WebSocketReceiveResult webSocketReceiveResult = await webSocket.ReceiveAsync(receivedDataBuffer, cancellationToken);
+                    Console.WriteLine("rpc invoking client result received.");
+                    if (webSocketReceiveResult.MessageType == WebSocketMessageType.Close)
+                    {
+                        await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, String.Empty, cancellationToken);
+                    }
+                    else
+                    {
+                        byte[] payloadData = receivedDataBuffer.Take(webSocketReceiveResult.Count).ToArray();
+                        using (var msrecv = new MemoryStream(payloadData))
                         {
-                            //response = eventKey + args
-                            var keyBytes = BitConverter.GetBytes(msg.handlerId);
-                            mssend.Write(keyBytes, 0, keyBytes.Length);
-                            serializer.Serialize(mssend, msg.ArgumentTypes, msg.Arguments);
-                            Console.WriteLine("rpc invoking client through websocket");
-                            await webSocket.SendAsync(new ArraySegment<byte>(mssend.ToArray()), WebSocketMessageType.Binary, true, cancellationToken);
-                        }
-                        //读取数据 
-                        WebSocketReceiveResult webSocketReceiveResult = await webSocket.ReceiveAsync(receivedDataBuffer, cancellationToken);
-                        Console.WriteLine("rpc invoking client result received.");
-                        if (webSocketReceiveResult.MessageType == WebSocketMessageType.Close)
-                        {
-                            await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, String.Empty, cancellationToken);
-                        }
-                        else
-                        {
-                            byte[] payloadData = receivedDataBuffer.Take(webSocketReceiveResult.Count).ToArray();
-                            using (var msrecv = new MemoryStream(payloadData))
+                            IRpcEventHandleResult result = null;
+                            if (msg.ReturnType == typeof(void))
                             {
-                                IRpcEventHandleResult result = null;
-                                if (msg.ReturnType == typeof(void))
-                                {
-                                    result = new RpcEventHandleResultVoid();
-                                }
-                                else
-                                {
-                                    var resultType = typeof(RpcEventHandleResultGeneral<>).MakeGenericType(msg.ReturnType);
-                                    result = Activator.CreateInstance(resultType) as IRpcEventHandleResult;
-                                }
-                                object[] values = serializer.Deserialize(msrecv, new Type[] { result.GetType() });
-                                Console.WriteLine("notify server continue executing.");
-                                msg.SetResult(values[0] as IRpcEventHandleResult);
+                                result = new RpcEventHandleResultVoid();
                             }
+                            else
+                            {
+                                var resultType = typeof(RpcEventHandleResultGeneral<>).MakeGenericType(msg.ReturnType);
+                                result = Activator.CreateInstance(resultType) as IRpcEventHandleResult;
+                            }
+                            object[] values = serializer.Deserialize(msrecv, new Type[] { result.GetType() });
+                            Console.WriteLine("notify server continue executing.");
+                            msg.SetResult(values[0] as IRpcEventHandleResult);
                         }
                     }
                 }
@@ -167,6 +170,18 @@ namespace RpcOverHttp
                 {
                     Console.WriteLine(ex.Message);
                     throw;
+                }
+            }
+        }
+
+        private void FixupEventHandlerSender(RpcEvent msg)
+        {
+            for (int i = 0; i < msg.Arguments.Length; i++)
+            {
+                var item = msg.Arguments[i];
+                if (item != null && typeof(IRpcService).IsAssignableFrom(item.GetType()))
+                {
+                    msg.Arguments[i] = "<service_instance>";
                 }
             }
         }
@@ -250,7 +265,7 @@ namespace RpcOverHttp
 
         ThunkImplementationFactory thunkImplFactory = new ThunkImplementationFactory();
         SafeDictionary<Guid, object> instances = new SafeDictionary<Guid, object>();
-        internal SafeDictionary<Guid, Queue<RpcEvent>> eventMessages = new SafeDictionary<Guid, Queue<RpcEvent>>();
+        internal SafeDictionary<Guid, BlockingQueue<RpcEvent>> eventMessages = new SafeDictionary<Guid, BlockingQueue<RpcEvent>>();
         private void ProcessNormalRequest(IRpcHttpContext ctx, Stream outputStream)
         {
             RpcError error = new RpcError("rpc server error.", null);
@@ -329,10 +344,10 @@ namespace RpcOverHttp
                                         impl = iocContainer.Resolve(itfType);
                                     }
                                     var implInternal = impl;
-                                    if (impl != null)
+                                    if (impl != null && !typeof(ThunkImplementation).IsAssignableFrom(impl.GetType()))
                                     {
                                         //thunk impl is for event remote handle, if no this thunk, server can not known which client handler will call
-                                        impl = this.instances[head.InstanceId] = thunkImplFactory.GetProxy(itfType, impl, this);
+                                        impl = this.instances[head.InstanceId] = thunkImplFactory.GetProxy(itfType, impl, head.InstanceId, this);
                                     }
 
                                     //process a call for getting user infomation if user code support authroize
@@ -407,6 +422,27 @@ namespace RpcOverHttp
                                                 }
                                                 catch { }
                                             }
+                                        }
+                                    }
+                                    catch (TargetInvocationException ex)
+                                    {
+                                        error_generated = true;
+                                        if (rpcService != null)
+                                        {
+                                            try
+                                            {
+                                                error = rpcService.HandleException(head, ex.InnerException);
+                                            }
+                                            catch (Exception ex2)
+                                            {
+                                                //do not use exceptionHandler here, it may cause a deal loop
+                                                //because the rpcService backend ex handler is exceptionHandler by default
+                                                error = RpcError.FromException(ex2);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            error = this.ExceptionHandler.HandleException(head, ex.InnerException);
                                         }
                                     }
                                     catch (Exception ex)

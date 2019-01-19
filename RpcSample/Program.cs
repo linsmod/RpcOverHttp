@@ -14,25 +14,21 @@ namespace RpcSample
 {
     class Program
     {
-        private static int Sample_TestEventHandlerWithReturn(string arg)
+        private static int Sample_SampleFuncEvent(string arg)
         {
             return arg.Length;
             //throw new NotImplementedException();
         }
 
-        private static void Sample_TestEventHandlerGeneric(object sender, object e)
+        private static void Sample_SampleActionEvent(object sender, string message)
         {
-            throw new NotImplementedException();
+            IRpcServiceSample sample = sender as IRpcServiceSample;
+            Console.WriteLine("received server SampleActionEvent:message=" + message);
         }
 
-        private static void Sample_TestEventHandler1(object sender, EventArgs e)
+        private static void Sample_SimpleEvent(object sender, EventArgs e)
         {
-            throw new NotImplementedException();
-        }
-
-        private static void Sample_TestEventHandler(object sender, EventArgs e)
-        {
-            throw new NotImplementedException();
+            Console.WriteLine("received server SimpleEvent");
         }
         static void Main(string[] args)
         {
@@ -42,15 +38,24 @@ namespace RpcSample
                 //var client = RpcClient.Initialize("https://localhost:8443/", "../../../RpcHost/bin/Debug/RpcOverHttp.cer");
                 client.ServerCertificateValidationCallback = (a, b, c, d) => true;
                 var sample = client.Rpc<IRpcServiceSample>();
-                sample.TestEventHandlerWithReturn += Sample_TestEventHandlerWithReturn;
-                sample.TestEventHandlerGeneric += Sample_TestEventHandlerGeneric;
-                sample.TestEventHandler -= Sample_TestEventHandler;
+
+                //remote event handler test
+                sample.SampleFuncEvent += Sample_SampleFuncEvent;
+                sample.SampleActionEvent += Sample_SampleActionEvent;
+                sample.SimpleEvent -= Sample_SimpleEvent;
+                sample.TestRemoteEventHandler();
+
+                //simple call test
                 var username = sample.GetUserName();
                 Debug.Assert(username.Equals("Anonymous"));
                 Console.WriteLine("GetUserName ok");
+
+                //authroize test
                 var isAuthenticated = sample.IsUserAuthenticated();
                 Debug.Assert(isAuthenticated.Equals(false));
                 Console.WriteLine("IsUserAuthenticated ok");
+
+                //authroize test 2
                 sample.TestAccessOk();
                 Console.WriteLine("TestAccessOk ok");
                 try
@@ -62,6 +67,8 @@ namespace RpcSample
                     Debug.Assert(ex.GetType().Equals(typeof(RpcException)));
                     Console.WriteLine("TestAccessDeniend ok");
                 }
+
+                //task call test
                 sample.TestRemoteTask().Wait();
                 var x = sample.TestRemoteTaskWithResult().Result;
                 Debug.Assert(x.Equals("remote task completed."));
@@ -72,6 +79,8 @@ namespace RpcSample
                     Debug.Assert(y.Equals("abc"));
                     Console.WriteLine("TestRemoteAsyncTaskWithResult ok");
                 });
+
+                //stream request and response test
                 var fsup = File.Open("testupload.bin", FileMode.Create);
                 int lines = 100;
                 var sw = new StreamWriter(fsup);
@@ -101,6 +110,6 @@ namespace RpcSample
             Console.ReadLine();
         }
 
-        
+
     }
 }

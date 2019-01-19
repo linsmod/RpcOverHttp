@@ -75,7 +75,7 @@ namespace RpcOverHttp
                 EventName = p[1]
             };
         }
-        internal static ThreadLocal<RpcHead> _provider;
+        internal static ThreadLocal<RpcHead> _provider=new ThreadLocal<RpcHead>();
         public static RpcHead Current
         {
             get
@@ -85,7 +85,6 @@ namespace RpcOverHttp
         }
         public static void SetCurrent(RpcHead value)
         {
-            _provider = new ThreadLocal<RpcHead>();
             _provider.Value = value;
         }
     }

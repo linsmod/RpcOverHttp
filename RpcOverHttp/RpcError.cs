@@ -28,7 +28,7 @@ namespace RpcOverHttp
 
         public override string ToString()
         {
-            return this.Message + (this.Detail != null ? "\r\n" + this.Detail.ToString() : "");
+            return this.Message + "\r\n from " + Location + (this.Detail != null ? "\r\n" + this.Detail.ToString() : "");
         }
     }
     /// <summary>

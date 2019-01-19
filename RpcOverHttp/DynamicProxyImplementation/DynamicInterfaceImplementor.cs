@@ -102,6 +102,7 @@ namespace DynamicProxyImplementation
                     CreateConstructorBaseCalls(dynamicProxyBaseType, tb);
 
                     DynamicImplementInterface(new List<Type> { interfaceType }, new List<string>(), interfaceType, tb);
+                    
                     ret = tb.CreateType();
 
                     dynamicTypes.Add(typeName, ret);

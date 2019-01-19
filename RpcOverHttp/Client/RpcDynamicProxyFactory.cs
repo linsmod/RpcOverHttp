@@ -36,7 +36,7 @@ namespace RpcOverHttp
         }
         public TInterface GetProxy<TInterface>(string token = null)
         {
-            return factory.CreateDynamicProxy<TInterface>(this, token);
+            return factory.CreateDynamicProxy<TInterface>(this, typeof(TInterface), token);
         }
         public Uri ApiUrl { get; set; }
         public RemoteCertificateValidationCallback ServerCertificateValidationCallback { get; internal set; }
@@ -46,9 +46,11 @@ namespace RpcOverHttp
             return this.ApiUrl + "download?token=" + token;
         }
     }
+    [DebuggerDisplay("{interfaceType,nq}")]
+    [DebuggerTypeProxy(typeof(RpcOverHttpDaynamicProxyView))]
     internal class RpcOverHttpDaynamicProxy : DynamicProxy
     {
-        string token;
+        internal string token;
         bool wsconnected = false;
         ClientWebSocket clientWebSocket = new ClientWebSocket();
         private object wsLock = new object();
@@ -56,12 +58,14 @@ namespace RpcOverHttp
         private Version version;
         MethodInfo methodMakeGenericTask;
         private int rpcTimeout = 120 * 1000;
-        private Guid instanceId = Guid.NewGuid();
-        public RpcOverHttpDaynamicProxy(RpcDynamicProxyFactory factory, string token)
+        internal Guid instanceId = Guid.NewGuid();
+        internal Type interfaceType;
+        public RpcOverHttpDaynamicProxy(RpcDynamicProxyFactory factory, Type interfaceType, string token)
         {
             this.token = token;
             this.factory = factory;
             this.version = typeof(RpcResponse).Assembly.GetName().Version;
+            this.interfaceType = interfaceType;
         }
 
         protected override bool TryGetMember(Type interfaceType, string name, out object result)
@@ -69,6 +73,7 @@ namespace RpcOverHttp
             result = null;
             return true;
         }
+
         protected override bool TryInvokeMember(Type interfaceType, int mdToken, bool eventOp, object[] args, out object result)
         {
             try
@@ -400,7 +405,11 @@ namespace RpcOverHttp
                     var eventKey = BitConverter.ToInt32(keyBytes, 0);
                     var key = this.subscriptions.Keys.Single(x => x == eventKey);
                     var handlerMethod = this.subscriptions[key];
-                    var arguments = serializer.Deserialize(inputms, handlerMethod.GetParameters().Select(x => x.ParameterType).ToArray());
+                    //the server will change a object sender to a string when process a eventhandler call. the string value is "<service-instance>"
+                    //we should fix
+                    var argTypes = handlerMethod.GetParameters().Select(x => x.ParameterType).ToArray();
+                    var fixup = this.FixupRemoteEventHandlerSenderType(argTypes);
+                    var arguments = serializer.Deserialize(inputms, argTypes);
 
                     IRpcEventHandleResult result =
                         handlerMethod.ReturnType == typeof(void) ?
@@ -410,6 +419,10 @@ namespace RpcOverHttp
                     object retVal = null;
                     try
                     {
+                        if (fixup)
+                        {
+                            this.FixupRemoteEventHandlerSenderValue(arguments);
+                        }
                         retVal = handlerMethod.Invoke(this, arguments);
                         result.Value = retVal;
                     }
@@ -424,6 +437,21 @@ namespace RpcOverHttp
                     }
                 }
             }
+        }
+
+        private void FixupRemoteEventHandlerSenderValue(object[] arguments)
+        {
+            arguments[0] = this;
+        }
+
+        private bool FixupRemoteEventHandlerSenderType(Type[] argTypes)
+        {
+            if (argTypes[0] == typeof(object))
+            {
+                argTypes[0] = typeof(string);
+                return true;
+            }
+            return false;
         }
 
         protected override bool TrySetEvent(Type interfaceType, string name, object value, bool add)
@@ -493,5 +521,20 @@ namespace RpcOverHttp
         {
             throw new NotSupportedException("invoke eventhandler in client side is not supported.");
         }
+    }
+
+    internal class RpcOverHttpDaynamicProxyView
+    {
+        RpcOverHttpDaynamicProxy proxy;
+        public RpcOverHttpDaynamicProxyView(RpcOverHttpDaynamicProxy proxy)
+        {
+            this.proxy = proxy;
+            this.IntanceId = proxy.instanceId;
+            this.AuthorizeToken = proxy.token;
+            this.ServiceType = proxy.interfaceType;
+        }
+        public Guid IntanceId { get; }
+        public string AuthorizeToken { get; }
+        public Type ServiceType { get; }
     }
 }

@@ -6,11 +6,12 @@ namespace RpcServiceCollection
 {
     public interface IRpcServiceSample
     {
-        event Func<string, int> TestEventHandlerWithReturn;
-        event EventHandler<object> TestEventHandlerGeneric;
-        event EventHandler TestEventHandler;
+        event Func<string, int> SampleFuncEvent;
+        event EventHandler SimpleEvent;
+        event EventHandler<string> SampleActionEvent;
         string GetUserName();
         bool IsUserAuthenticated();
+        void TestRemoteEventHandler();
         void TestAccessDeniend();
         void TestAccessOk();
         Task TestRemoteTask();
