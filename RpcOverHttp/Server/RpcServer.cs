@@ -230,7 +230,6 @@ namespace RpcOverHttp
             catch (Exception ex)
             {
                 Console.WriteLine("{0} {1}", ex.Message, ex.StackTrace);
-                ctx.Response.KeepAlive = false;
                 ctx.Response.StatusCode = 500;
                 ctx.Response.StatusDescription = "Internal Server Error";
                 ctx.Response.Close();

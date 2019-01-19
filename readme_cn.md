@@ -1,25 +1,25 @@
-Selet language: **ENGLISH** | [中文](readme_cn.md)
+选择语言: **中文** | [ENGLISH](readme.md)
 
 ### RpcOverHttp
-a .NET interface based rpc framework, process command using http protocol under the hood.
-the interface/implementation and its method is like the asp.net mvc controller+action style but more simple to client use.
+一个基于.NET接口的rpc框架，使用http协议。
+接口/实现及其方法类似于asp.net mvc的controller/action样式，但更易于客户端使用。
 
 
 
-## features.
-- interface based. makes you **focus on the business**.
-- **async support** by providing Task/Task&lt;T&gt; as a method return type.
-- provide **ioc container** both in server and client.
-- control **authroization, serialization** by your self or framework default.
-- serialize data using the built-in protobuf serializer and serialize rpc header using json serializer as default.
-- server **exception wrapping**, client will throw a RpcException when received a server side error.
-- support self host and **iis intergration**.
-- **.net event** supported (required Windows8 and Server2012 when using iis-intergration). 
-- support https, provide https certificate auto generation when self host mode.
-- **auto dispose** the method arguments and return value after user code when using Stream or other objects inherited from Idisposible.
+## 特性
+- 基于接口, 让你**专注于业务**。
+-  **异步支持**, 通过提供Task/Task&lt; T&gt; 作为方法返回类型。
+- **依赖注入**, 在服务器和客户端封装ioc容器，提供类型和对象注册的方法。
+- 通过你自己或框架内置的默认的实现控制**调用认证**，**数据序列化**。
+- 使用内置的protobuf serializer序列化请求参数，使用json serializer序列化请求元数据（RpcHead, 包含接口方法路由信息）。
+- 使用服务器端**异常包装**，客户端在收到服务器端错误时将抛出RpcException。
+- 支持self host 和**iis集成**。
+-  **支持.NET事件**，由websocket驱动（使用iis-集成时要求Windows8，Server2012，及以上）。 
+- 支持https，在自托管模式下自动生成https自签名证书。
+-  **对象自动释放** 当使用Stream或从IDisposible继承的其他对象，框架将自动调用IDisposible.Dispose。
 
-## How to use?
-### 1)define the interface in MyInterface.dll
+## 如何使用？
+### 1）在MyInterface.dll中定义接口
 ```
 public interface IRpcServiceSample
     {
@@ -36,9 +36,10 @@ public interface IRpcServiceSample
 
 ```
 
-### 2)implement the interface in MyImpl.dll, reference RpcOverHttp.dll, MyInterface.dll
+### 2）在MyImpl.dll中实现接口，引用RpcOverHttp.dll，MyInterface.dll
 
- RpcService is only for access user info here. can be removed if do not accss User object
+ RpcService仅用于访问用户信息。如果不使用User对象可以删除
+
 
 ````
 public class RpcServiceSample : RpcService, IRpcServiceSample
@@ -94,7 +95,7 @@ public class RpcServiceSample : RpcService, IRpcServiceSample
 
 ````
 
-### 3)create server in a console application, reference RpcOverHttp.dll, MyInterface.dll and MyImpl.dll
+### 3）在控制台应用程序项目中创建测试服务，引用RpcOverHttp.dll，MyInterface.dll和MyImpl.dll
 ```
 public static void Main(string[] args)
         {
@@ -107,7 +108,7 @@ public static void Main(string[] args)
 
 ```
 
-### 4)create client in a console application, reference RpcOverHttp.dll, MyInterface.dll
+### 4）在控制台应用程序项目中创建测试客户端，引用RpcOverHttp.dll，MyInterface.dll
 
 ```
 static void Main(string[] args)
@@ -167,32 +168,31 @@ static void Main(string[] args)
 
 ```
 
-## argument types supported
-- .NET primitive types and String, Array, List&lt;T&gt;, Enum
-- Stream
-- classes that only using the types mentioned above.
+## 支持的参数类型
+-  .NET基础类型和String，List&lt; T&gt;，Enum
+-  Stream
+- 仅使用上述类型的类。
+- 上述类型或仅使用上述类型的类的数组或泛型List
 
-## limitations
-- see #argument types supported
-- nested Task as return type is not supported.
+## 限制
+- 请参阅支持的#argument类型
+- 不支持嵌套Task作为返回类型。
 
 ## https
-yes, it supports https with a simple way.
-self host mode:
-- at server side, if you use a https url, when server starting, framework will auto generate a cert file pair(private key will install to system(LocalMachine->Personal) and the public key is exported as a cert file under working dir for client use)
-- at client side, find the exported cert file by server and feed it to the initialize method.
+self host模式：
+- 在服务器端，如果你使用https网址，当服务器启动时，框架将自动生成一个自签名证书文件对（私钥将安装到系统（LocalMachine-> Personal），公钥将保存在工作目录下供客户使用）
+- 在客户端，将服务端导出的证书公钥文件提供给initialize方法。
 ```
-public static RpcClient Initialize(string url, string cerFilePath, WebProxy proxy = null)
+public static RpcClient Initialize（string url，string cerFilePath，WebProxy proxy = null）
 ```
-to regenerate cert file pair, delete the cert from system(LocalMachine->Personal). the cert name is "RpcOverHttp"
+要重新生成证书文件对，请从系统中删除证书（LocalMachine-> Personal）。证书名称为“RpcOverHttp”
 
-iis-intergration mode:
-- at server side, select the cert file by using iis manager as usual.
-- at client side, when ssl server certificate checking error, RpcClient.ServerCertificateValidationCallback will be called. just handle it like using HttpWebReqeust.ServerCertificateValidationCallback.
+iis-integration模式：
+- 在服务器端，使用iis管理器选择证书文件。
+- 在客户端，当ssl服务器证书检查出错时，将调用RpcClient.ServerCertificateValidationCallback。只需要像使用HttpWebReqeust.ServerCertificateValidationCallback一样处理它。
 
-## iis intergration since version 3.3.0
-we provided a http module for host rpc server on iis since version 3.3.0. 
-selfhost sample:
+## 从版本3.3.0开始支持iis集成，为在iis上托管rpc服务器提供了http模块
+self host示例：
 ```
 	public class Program
     {
@@ -208,7 +208,8 @@ selfhost sample:
 
 ```
 
-and the iis module sample:
+iis模块示例：
+
 
 ```
 	//dll name is RpcHost, namespace is RpcHost
@@ -221,11 +222,11 @@ and the iis module sample:
     }
 ```
 
-**you should build your server project as a dll instead of an application(exe).** when using iis-intergration
+**在使用iis-integration时，请将服务器项目构建为dll而不是应用程序（exe）。**
 
-then copy all the output dlls into site’s bin folder(create one if non exists).
+然后将服务端项目所有输出dll复制到site的bin文件夹中（如果bin文件夹不存在则创建一个）。
 
-then register the http module in web.config
+然后在web.config中注册http模块
 
 ```
 <?xml version="1.0" encoding="UTF-8"?>
@@ -238,11 +239,6 @@ then register the http module in web.config
         <modules>
             <add name="RpcWebHostHttpModule" type="RpcHost.RpcWebHostHttpModule" />
         </modules>
-        <httpProtocol>
-            <customHeaders>
-                <remove name="X-Powered-By" />
-            </customHeaders>
-        </httpProtocol>
     </system.webServer>
 </configuration>
 
