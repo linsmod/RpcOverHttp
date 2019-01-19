@@ -204,7 +204,7 @@ namespace RpcOverHttp
             for (int i = 0; i < argTypes.Length; i++)
             {
                 argTypes[i] = typeof(int);
-                args[i] = (args[i] as RemoteEventSubscriptionKey).GetHashCode();
+                args[i] = (args[i] as RemoteEventSubscription).GetHashCode();
             }
         }
 
@@ -378,7 +378,7 @@ namespace RpcOverHttp
         /// <summary>
         /// key = interface.method + . + eventhandler.method
         /// </summary>
-        Dictionary<RemoteEventSubscriptionKey, MethodInfo> subscriptions = new Dictionary<RemoteEventSubscriptionKey, MethodInfo>();
+        Dictionary<RemoteEventSubscription, MethodInfo> subscriptions = new Dictionary<RemoteEventSubscription, MethodInfo>();
 
         private async Task EventListenerThread()
         {
@@ -462,18 +462,18 @@ namespace RpcOverHttp
             }
             return true;
         }
-        private RemoteEventSubscriptionKey AddSubscription(Type interfaceType, string eventName, MethodInfo eventHandlerMethod)
+        private RemoteEventSubscription AddSubscription(Type interfaceType, string eventName, MethodInfo eventHandlerMethod)
         {
-            var key = new RemoteEventSubscriptionKey(interfaceType, eventName, eventHandlerMethod);
+            var key = new RemoteEventSubscription(this.instanceId, interfaceType, eventName, eventHandlerMethod);
             var idk = BitConverter.GetBytes(key.GetHashCode());
             if (!subscriptions.ContainsKey(key))
                 subscriptions.Add(key, eventHandlerMethod);
             return key;
         }
 
-        private RemoteEventSubscriptionKey RemoveSubscription(Type interfaceType, string eventName, MethodInfo eventHandlerMethod)
+        private RemoteEventSubscription RemoveSubscription(Type interfaceType, string eventName, MethodInfo eventHandlerMethod)
         {
-            var key = new RemoteEventSubscriptionKey(interfaceType, eventName, eventHandlerMethod);
+            var key = new RemoteEventSubscription(this.instanceId, interfaceType, eventName, eventHandlerMethod);
             var idk = BitConverter.GetBytes(key.GetHashCode());
             subscriptions.Remove(key);
             return key;
@@ -488,6 +488,10 @@ namespace RpcOverHttp
         {
             clientWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "dispose", CancellationToken.None).Wait();
             base.Dispose(disposing);
+        }
+        protected override bool TryInvokeEventHandler(Type interfaceType, Type handlerType, string name, object[] args, out object resul)
+        {
+            throw new NotSupportedException("invoke eventhandler in client side is not supported.");
         }
     }
 }

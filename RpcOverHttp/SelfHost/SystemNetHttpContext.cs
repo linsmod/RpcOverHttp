@@ -25,6 +25,7 @@ namespace RpcOverHttp.SelfHost
             {
                 var func = state as Func<IRpcWebSocketContext, Task>;
                 await userFunc(wsctx);
+                Console.WriteLine("a ws client disconnected.");
             }, userFunc);
         }
 

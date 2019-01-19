@@ -75,6 +75,19 @@ namespace RpcOverHttp
                 EventName = p[1]
             };
         }
+        internal static ThreadLocal<RpcHead> _provider;
+        public static RpcHead Current
+        {
+            get
+            {
+                return _provider == null ? null : _provider.Value;
+            }
+        }
+        public static void SetCurrent(RpcHead value)
+        {
+            _provider = new ThreadLocal<RpcHead>();
+            _provider.Value = value;
+        }
     }
 
     /// <summary>
@@ -168,7 +181,7 @@ namespace RpcOverHttp
         public Type ReturnType { get; internal set; }
         AutoResetEvent waitHandle = new AutoResetEvent(false);
         IRpcEventHandleResult Result { get; set; }
-        public int EventKey { get; internal set; }
+        public int handlerId { get; internal set; }
 
         internal void SetResult(IRpcEventHandleResult result)
         {
@@ -177,8 +190,16 @@ namespace RpcOverHttp
         }
         internal IRpcEventHandleResult WaitResult(int millisecondsTimeout)
         {
-            waitHandle.WaitOne(millisecondsTimeout);
-            return this.Result;
+            if (waitHandle.WaitOne(millisecondsTimeout))
+            {
+                Console.WriteLine("server is continue with a client feed.");
+                return this.Result;
+            }
+            else
+            {
+                Console.WriteLine("server is failed to continue as wsrpc timeout.");
+                throw new TimeoutException(string.Format("rpc to client is timeout, subscription key is {0}.", handlerId));
+            }
         }
     }
 

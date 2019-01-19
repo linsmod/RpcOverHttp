@@ -35,6 +35,7 @@ namespace RpcOverHttp
 
     public interface IRpcService
     {
+        RpcPrincipal User { get; }
         RpcIdentity Authroize(string token);
         RpcError HandleException(RpcHead head, Exception ex);
     }

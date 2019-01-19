@@ -13,11 +13,15 @@ namespace DynamicProxyImplementation
         public static MethodInfo TrySetEventMethodInfo = ExpressionHelper.GetMethodCallExpressionMethodInfo<DynamicProxy>(o => o.TrySetEvent(null, null, null, true));
         public static MethodInfo TryInvokeMemberMethodInfo = ExpressionHelper.GetMethodCallExpressionMethodInfo<DynamicProxy>(o => o.TryInvokeMember(null, 0, false, null, out dummyOut));
 
+        public static MethodInfo TryInvokeEventHandlerMethodInfo = ExpressionHelper.GetMethodCallExpressionMethodInfo<DynamicProxy>(o => o.TryInvokeEventHandler(null, null, null, null, out dummyOut));
+
         protected DynamicProxy()
         {
         }
 
         protected abstract bool TryInvokeMember(Type interfaceType, int id, bool eventOp, object[] args, out object result);
+
+        protected abstract bool TryInvokeEventHandler(Type interfaceType, Type handlerType, string name, object[] args, out object resul);
 
         protected abstract bool TrySetMember(Type interfaceType, string name, object value);
 
@@ -47,29 +51,6 @@ namespace DynamicProxyImplementation
         ~DynamicProxy()
         {
             Dispose(false);
-        }
-    }
-
-    public class DefaultDynamicProxy : DynamicProxy
-    {
-        protected override bool TryGetMember(Type interfaceType, string name, out object result)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected override bool TryInvokeMember(Type interfaceType, int id, bool eventOp, object[] args, out object result)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected override bool TrySetEvent(Type interfaceType, string name, object value, bool add)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected override bool TrySetMember(Type interfaceType, string name, object value)
-        {
-            throw new NotImplementedException();
         }
     }
 }

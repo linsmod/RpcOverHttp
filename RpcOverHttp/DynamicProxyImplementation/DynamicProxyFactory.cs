@@ -39,9 +39,25 @@ namespace DynamicProxyImplementation
 
             Type t = interfaceImplementor.CreateType(interfaceType, typeof(TDynamicProxyType));
             ret = Activator.CreateInstance(t, constructorParameters);
-
             return ret;
         }
+        public virtual object CreateDynamicProxyUsingBaseType(Type interfaceType, Type baseType, params object[] constructorParameters)
+        {
+            if (interfaceType == null)
+            {
+                throw new ArgumentNullException("interfaceType");
+            }
 
+            if (!interfaceType.IsInterface)
+            {
+                throw new ArgumentException("interfaceType must be an interface!"); //LOCSTR
+            }
+
+            object ret = null;
+
+            Type t = interfaceImplementor.CreateType(interfaceType, typeof(TDynamicProxyType));
+            ret = Activator.CreateInstance(t, constructorParameters);
+            return ret;
+        }
     }
 }

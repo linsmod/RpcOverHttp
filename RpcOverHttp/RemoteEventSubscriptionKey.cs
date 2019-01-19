@@ -7,28 +7,33 @@ using System.Threading.Tasks;
 
 namespace RpcOverHttp
 {
-    internal class RemoteEventSubscriptionKey : IEqualityComparer<RemoteEventSubscriptionKey>
+    internal class RemoteEventSubscription : IEqualityComparer<RemoteEventSubscription>
     {
-        public RemoteEventSubscriptionKey(Type interfaceType, string eventName, MethodInfo handlerMethod)
+        public RemoteEventSubscription(Guid instanceId, Type interfaceType, string eventName, MethodInfo handlerMethod)
         {
+            this.InstanceId = instanceId;
             this.InterfaceType = interfaceType;
             this.EventName = eventName;
             this.HandlerMethod = handlerMethod;
         }
 
-        public Type InterfaceType { get; set; }
-        public string EventName { get; set; }
-        public MethodInfo HandlerMethod { get; set; }
-        public bool Equals(RemoteEventSubscriptionKey x, RemoteEventSubscriptionKey y)
+        public Guid InstanceId { get; private set; }
+        public Type InterfaceType { get; private set; }
+        public string EventName { get; private set; }
+        public MethodInfo HandlerMethod { get; private set; }
+        public bool Equals(RemoteEventSubscription x, RemoteEventSubscription y)
         {
-            return x.InterfaceType.Equals(y.InterfaceType)
+            return x.InstanceId.Equals(y.InstanceId)
+                && x.InterfaceType.Equals(y.InterfaceType)
                 && x.EventName.Equals(y.EventName)
                 && x.HandlerMethod.Equals(y.HandlerMethod);
         }
 
-        public int GetHashCode(RemoteEventSubscriptionKey obj)
+        public int GetHashCode(RemoteEventSubscription obj)
         {
-            return (string.Join("|", obj.InterfaceType.Assembly.FullName,
+            return (string.Join("|",
+                obj.InstanceId,
+                obj.InterfaceType.Assembly.FullName,
                 obj.InterfaceType.FullName,
                 EventName,
                 HandlerMethod.DeclaringType.Assembly.FullName,
@@ -37,7 +42,7 @@ namespace RpcOverHttp
                 HandlerMethod.MetadataToken
                 )).GetHashCode();
         }
-        public static implicit operator int(RemoteEventSubscriptionKey key)
+        public static implicit operator int(RemoteEventSubscription key)
         {
             return key.GetHashCode();
         }

@@ -16,7 +16,8 @@ namespace RpcSample
     {
         private static int Sample_TestEventHandlerWithReturn(string arg)
         {
-            throw new NotImplementedException();
+            return arg.Length;
+            //throw new NotImplementedException();
         }
 
         private static void Sample_TestEventHandlerGeneric(object sender, object e)

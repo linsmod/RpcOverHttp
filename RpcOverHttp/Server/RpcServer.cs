@@ -40,14 +40,16 @@ namespace RpcOverHttp
         private IEnumerable<Type> implTypes;
         private IEnumerable<object> impls;
         RpcHttpListener listener;
+        public IExceptionHandler ExceptionHandler { get; set; }
+        public IAuthroizeHandler AuthroizeHandler { get; set; }
         public RpcServer() : base(new TinyIoCContainer())
         {
             iocContainer.Register<IRpcDataSerializer, ProtoBufRpcDataSerializer>(new ProtoBufRpcDataSerializer(), "default");
             iocContainer.Register<IRpcHeadSerializer, JsonRpcHeadSerializer>(new JsonRpcHeadSerializer(), "default");
             iocContainer.Register<IRpcServer>(this, "default");
             iocContainer.Register<IRpcServiceAdministration>(new RpcServiceAdministration());
-            iocContainer.Register<IExceptionHandler>(new DefaultExceptionHandler(), "default");
-            iocContainer.Register<IAuthroizeHandler>(new DefaultAuthroizeHandler(), "default");
+            iocContainer.Register<IExceptionHandler>((ExceptionHandler = new DefaultExceptionHandler()), "default");
+            iocContainer.Register<IAuthroizeHandler>((AuthroizeHandler = new DefaultAuthroizeHandler()), "default");
         }
 
         /// <summary>
@@ -85,6 +87,7 @@ namespace RpcOverHttp
             }
             else
             {
+
                 this.ProcessRequestInternal(ctx);
             }
         }
@@ -103,10 +106,12 @@ namespace RpcOverHttp
             var instanceIdStr = ctx.RequestUri.PathAndQuery.Substring(ctx.RequestUri.PathAndQuery.IndexOf('=') + 1);
             Queue<RpcEvent> messages;
             var instanceId = Guid.Parse(instanceIdStr);
+
             if (!eventMessages.TryGetValue(instanceId, out messages))
             {
                 eventMessages[instanceId] = messages = new Queue<RpcEvent>();
             }
+            Console.WriteLine("ws client connected, rpc service instance id is {0}.", instanceId);
             IRpcDataSerializer serializer;
             if (!iocContainer.TryResolve(out serializer))
             {
@@ -123,14 +128,15 @@ namespace RpcOverHttp
                         using (var mssend = new MemoryStream())
                         {
                             //response = eventKey + args
-                            var keyBytes = BitConverter.GetBytes(msg.EventKey);
+                            var keyBytes = BitConverter.GetBytes(msg.handlerId);
                             mssend.Write(keyBytes, 0, keyBytes.Length);
                             serializer.Serialize(mssend, msg.ArgumentTypes, msg.Arguments);
+                            Console.WriteLine("rpc invoking client through websocket");
                             await webSocket.SendAsync(new ArraySegment<byte>(mssend.ToArray()), WebSocketMessageType.Binary, true, cancellationToken);
                         }
                         //读取数据 
                         WebSocketReceiveResult webSocketReceiveResult = await webSocket.ReceiveAsync(receivedDataBuffer, cancellationToken);
-
+                        Console.WriteLine("rpc invoking client result received.");
                         if (webSocketReceiveResult.MessageType == WebSocketMessageType.Close)
                         {
                             await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, String.Empty, cancellationToken);
@@ -151,6 +157,7 @@ namespace RpcOverHttp
                                     result = Activator.CreateInstance(resultType) as IRpcEventHandleResult;
                                 }
                                 object[] values = serializer.Deserialize(msrecv, new Type[] { result.GetType() });
+                                Console.WriteLine("notify server continue executing.");
                                 msg.SetResult(values[0] as IRpcEventHandleResult);
                             }
                         }
@@ -188,6 +195,7 @@ namespace RpcOverHttp
 
         internal void ProcessRequestInternal(object state)
         {
+
             var ctx = state as IRpcHttpContext;
             Stream outputStream = ctx.Response.OutputStream;
             bool acceptGzip = AcceptsGzip(ctx.Request);
@@ -240,8 +248,9 @@ namespace RpcOverHttp
             return encoding.Contains("gzip");
         }
 
+
+        ThunkImplementationFactory thunkImplFactory = new ThunkImplementationFactory();
         SafeDictionary<Guid, object> instances = new SafeDictionary<Guid, object>();
-        SafeDictionary<Guid, CommonEventHandler> eventHandlers = new SafeDictionary<Guid, CommonEventHandler>();
         internal SafeDictionary<Guid, Queue<RpcEvent>> eventMessages = new SafeDictionary<Guid, Queue<RpcEvent>>();
         private void ProcessNormalRequest(IRpcHttpContext ctx, Stream outputStream)
         {
@@ -276,6 +285,7 @@ namespace RpcOverHttp
                     }
                     if (head != null)
                     {
+                        RpcHead.SetCurrent(head);
                         Type itfType = itfTypes.FirstOrDefault(x => x.Namespace == head.Namespace && x.Name == head.TypeName);
                         if (itfType != null)
                         {
@@ -317,34 +327,31 @@ namespace RpcOverHttp
                                     if (!this.instances.TryGetValue(head.InstanceId, out impl))
                                     {
                                         //resolve the implimentation of the interface
-                                        this.instances[head.InstanceId] = impl = iocContainer.Resolve(itfType);
+                                        impl = iocContainer.Resolve(itfType);
                                     }
-
+                                    var implInternal = impl;
                                     if (impl != null)
                                     {
-                                        this.instances[head.InstanceId] = impl;
+                                        //thunk impl is for event remote handle, if no this thunk, server can not known which client handler will call
+                                        impl = this.instances[head.InstanceId] = thunkImplFactory.GetProxy(itfType, impl, this);
                                     }
-
-                                    //exception handler and authroize handler
-                                    var exceptionHandler = iocContainer.Resolve<IExceptionHandler>("default");
-                                    var authorizeHandler = iocContainer.Resolve<IAuthroizeHandler>("default");
 
                                     //process a call for getting user infomation if user code support authroize
                                     rpcService = impl as IRpcService;
-                                    var abstractRpcService = impl as RpcService;
+                                    var abstractRpcService = implInternal as RpcService;
                                     if (abstractRpcService != null)
                                     {
-                                        abstractRpcService.exceptionHandler = exceptionHandler;
-                                        abstractRpcService.authorizeHandler = authorizeHandler;
+                                        abstractRpcService.exceptionHandler = this.ExceptionHandler;
+                                        abstractRpcService.authorizeHandler = this.AuthroizeHandler;
                                     }
-                                    RpcIdentity identity = rpcService != null ? rpcService.Authroize(head.Token) : authorizeHandler.Authroize(head.Token);
+                                    RpcIdentity identity = rpcService != null ? rpcService.Authroize(head.Token) : AuthroizeHandler.Authroize(head.Token);
                                     var principal = new RpcPrincipal(identity);
                                     Thread.CurrentPrincipal = principal;
                                     if (abstractRpcService != null)
                                     {
                                         abstractRpcService.User = principal;
                                     }
-                                    var rpcAdministration = impl as RpcServiceAdministration;
+                                    var rpcAdministration = implInternal as RpcServiceAdministration;
                                     if (rpcAdministration != null)
                                     {
                                         rpcAdministration.Server = this;
@@ -368,27 +375,27 @@ namespace RpcOverHttp
                                             {
                                                 var op = head.GetEventOp();
                                                 //create a method as the event proxy
-                                                EventInfo e = TypeHelper.GetEventInfo(itfType, op.EventName);
-                                                CommonEventHandler handler;
-                                                if (!eventHandlers.TryGetValue(head.InstanceId, out handler))
-                                                {
-                                                    eventHandlers[head.InstanceId] = handler = new CommonEventHandler(this, head.InstanceId);
-                                                }
-                                                var m_signature = e.EventHandlerType.GetMethod("Invoke");
-                                                var d = handler.CreateProxyDelegate(e.EventHandlerType, m_signature, (int)args[0]/*event subscription id*/);
 
+                                                EventInfo e = TypeHelper.GetEventInfo(itfType, op.EventName);
+                                                var hanlderName = itfType.Name + "_" + op.EventName;
+                                                var thunkHandler = instanceType.GetMethod(hanlderName);
+
+                                                var clientHandlerId = (int)args[0]; /*event callback id of client*/
                                                 //event register/unregister
                                                 if (op.EventKind == RpcEventKind.Add)
                                                 {
-                                                    e.AddEventHandler(impl, d);
+                                                    EventHub.AddEventHandler(e, impl, head.InstanceId, thunkHandler, clientHandlerId);
                                                 }
                                                 else
                                                 {
-                                                    e.RemoveEventHandler(impl, d);
+                                                    EventHub.RemoveEventHandler(e, impl, head.InstanceId, thunkHandler, clientHandlerId);
                                                 }
                                             }
                                             else
                                             {
+                                                //retrive and store nessesery info.
+                                                //TODO
+
                                                 MethodInfo implMethod = RpcMethodHelper.FindImplMethod(itfType, itfMethod, instanceType);
                                                 returnVal = RpcMethodHelper.Invoke(itfType, itfMethod, impl, implMethod, head.EventOp, head.Timeout, head.Token, args);
                                             }
@@ -421,7 +428,7 @@ namespace RpcOverHttp
                                         }
                                         else
                                         {
-                                            error = exceptionHandler.HandleException(head, ex);
+                                            error = this.ExceptionHandler.HandleException(head, ex);
                                         }
                                     }
                                     if (!error_generated)

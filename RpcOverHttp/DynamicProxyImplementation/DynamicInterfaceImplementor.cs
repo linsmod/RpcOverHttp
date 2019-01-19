@@ -16,7 +16,9 @@ namespace DynamicProxyImplementation
         {
             InitTypeBuilder();
         }
-
+        AssemblyBuilder ab;
+        AssemblyName assemblyName;
+        string dllName;
         private ModuleBuilder moduleBuilder = null;
         private void InitTypeBuilder()
         {
@@ -24,11 +26,13 @@ namespace DynamicProxyImplementation
             trySetMemberMethodInfo = DynamicProxy.TrySetMemberMethodInfo;
             trySetEventMethodInfo = DynamicProxy.TrySetEventMethodInfo;
             tryInvokeMemberInfo = DynamicProxy.TryInvokeMemberMethodInfo;
+            tryInvokeEventHandlerMethodInfo = DynamicProxy.TryInvokeEventHandlerMethodInfo;
 
             Type ownClass = typeof(DynamicInterfaceImplementor);
-            AssemblyName assemblyName = new AssemblyName(string.Concat(ownClass.Assembly.GetName().Name, ".", ownClass.Namespace));
-            AssemblyBuilder ab = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave, null, System.Security.SecurityContextSource.CurrentAppDomain);
-            moduleBuilder = ab.DefineDynamicModule(assemblyName.Name, string.Concat(assemblyName.Name, ".dll"));
+            assemblyName = new AssemblyName(string.Concat(ownClass.Assembly.GetName().Name, ".", ownClass.Namespace));
+            dllName = string.Concat(assemblyName.Name, ".dll");
+            ab = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave, null, System.Security.SecurityContextSource.CurrentAppDomain);
+            moduleBuilder = ab.DefineDynamicModule(assemblyName.Name, dllName);
 
             listAddMethodInfo = TypeHelper.GetMethodInfo(typeof(List<object>), listAddMethodName, new Type[] { typeof(object) });
             listToArrayMethodInfo = TypeHelper.GetMethodInfo(typeof(List<object>), listToArrayMethodName, Type.EmptyTypes);
@@ -55,7 +59,7 @@ namespace DynamicProxyImplementation
         private MethodInfo delegateCombineMethodInfo = null;
         private MethodInfo delegateRemoveMethodInfo = null;
         private MethodInfo activatorCreateInstanceMethodInfo = null;
-
+        private MethodInfo tryInvokeEventHandlerMethodInfo = null;
         private MethodInfo tryGetMemberMethodInfo = null;
         private MethodInfo trySetMemberMethodInfo = null;
         private MethodInfo trySetEventMethodInfo = null;
@@ -82,7 +86,7 @@ namespace DynamicProxyImplementation
                 throw new ArgumentException("dynamicProxyType must be a child of DynamicProxy"); //LOCSTR
             }
 
-            string typeName = string.Concat(typeof(DynamicInterfaceImplementor).Assembly.GetName().Name, ".", interfaceType.FullName);
+            string typeName = string.Concat(typeof(DynamicInterfaceImplementor).Assembly.GetName().Name, ".Dynamic.", dynamicProxyBaseType.Name);
             bool gotLock = false;
             try
             {
@@ -101,6 +105,7 @@ namespace DynamicProxyImplementation
                     ret = tb.CreateType();
 
                     dynamicTypes.Add(typeName, ret);
+                    this.ab.Save(this.dllName);
                 }
             }
             finally
@@ -110,7 +115,7 @@ namespace DynamicProxyImplementation
                     dynamicTypeEmitSyncRoot.Exit();
                 }
             }
-            
+
             return ret;
         }
 
@@ -322,9 +327,9 @@ namespace DynamicProxyImplementation
         {
             string eventName = eventInfo.Name;
             Type ehType = eventInfo.EventHandlerType;
-            LocalBuilder typeLb = ilGenerator.DeclareLocal(typeof(Type), true);//loc_0
-            LocalBuilder objectLb = ilGenerator.DeclareLocal(typeof(object), true);//loc_1
-            LocalBuilder retLb = ilGenerator.DeclareLocal(typeof(bool), true);//loc_2
+            LocalBuilder typeLb = ilGenerator.DeclareLocal(typeof(Type), false);//loc_0
+            LocalBuilder objectLb = ilGenerator.DeclareLocal(typeof(object), false);//loc_1
+            LocalBuilder retLb = ilGenerator.DeclareLocal(typeof(bool), false);//loc_2
 
             //C#: Type.GetTypeFromHandle(interfaceType)
             EmitAndStoreGetTypeFromHandle(ilGenerator, eventInfo.DeclaringType, OpCodes.Stloc_0);
@@ -393,7 +398,90 @@ namespace DynamicProxyImplementation
                     tb.DefineMethodOverride(getMb, removeMethodInfo);
 
                 }
+                //default handler
+                {
+                    var m_signature = eventInfo.EventHandlerType.GetMethod("Invoke");
+                    var handlerName = interfaceType.Name + "_" + eventInfo.Name;
+                    var handlerBuilder = tb.DefineMethod(handlerName, MethodAttributes.Public, m_signature.ReturnType, m_signature.GetParameters().Select(x => x.ParameterType).ToArray());
+                    var ilGenerator = handlerBuilder.GetILGenerator();
+                    EmitInvokeEventHandler(ilGenerator, m_signature, handlerName, eventInfo, ef);
+                }
             }
+        }
+        private void EmitInvokeEventHandler(ILGenerator ilGenerator, MethodInfo mi, string methodName, EventInfo eventInfo, FieldBuilder eventField)
+        {
+            LocalBuilder typeLb = ilGenerator.DeclareLocal(typeof(Type), false);//Stloc_0 Ldloc_0
+            LocalBuilder paramsLb = ilGenerator.DeclareLocal(typeof(List<object>), false);//Stloc_1 Ldloc_1
+            LocalBuilder resultLb = ilGenerator.DeclareLocal(typeof(object), false);//Stloc_2 Ldloc_2
+            LocalBuilder retLb = ilGenerator.DeclareLocal(typeof(bool), false);//Stloc_3 Ldloc_3
+
+
+            //C#: Type.GetTypeFromHandle(interfaceType)
+            EmitAndStoreGetTypeFromHandle(ilGenerator, eventInfo.DeclaringType, OpCodes.Stloc_0);
+
+
+           
+            //C#: params = new List<object>()
+            ilGenerator.Emit(OpCodes.Newobj, typeof(List<object>).GetConstructor(Type.EmptyTypes));
+            ilGenerator.Emit(OpCodes.Stloc_1);
+
+
+
+            int i = 0;
+            foreach (ParameterInfo pi in mi.GetParameters())
+            {
+                //C#: params.Add(param[i])
+                i++;
+                ilGenerator.Emit(OpCodes.Ldloc_1);
+                ilGenerator.Emit(OpCodes.Ldarg, i);
+                if (pi.ParameterType.IsValueType)
+                {
+                    ilGenerator.Emit(OpCodes.Box, pi.ParameterType);
+                }
+                ilGenerator.EmitCall(OpCodes.Callvirt, listAddMethodInfo, null);
+            }
+            //C#: ret = DynamicProxy.InvokeEventHandler(interfaceType, method, name, params, out result)
+            ilGenerator.Emit(OpCodes.Ldarg_0);//this
+            ilGenerator.Emit(OpCodes.Ldloc_0);//interfaceType
+            
+            //C#: Type.GetTypeFromHandle(interfaceType)
+            EmitAndStoreGetTypeFromHandle(ilGenerator, eventInfo.EventHandlerType, OpCodes.Stloc_0);
+
+            ilGenerator.Emit(OpCodes.Ldloc_0);//hanlderType
+            ilGenerator.Emit(OpCodes.Ldstr, methodName);//methodName
+            ilGenerator.Emit(OpCodes.Ldloc_1);//param[0]
+            ilGenerator.EmitCall(OpCodes.Callvirt, listToArrayMethodInfo, null);
+            ilGenerator.Emit(OpCodes.Ldloca_S, 2);
+            ilGenerator.EmitCall(OpCodes.Callvirt, tryInvokeEventHandlerMethodInfo, null);
+            ilGenerator.Emit(OpCodes.Stloc_3);
+
+            if (mi.ReturnType != typeof(void))
+            {
+                ilGenerator.Emit(OpCodes.Ldloc_2);
+                //C#: if(ret == ValueType && ret == null){
+                //    ret = Activator.CreateInstance(returnType) }
+                if (mi.ReturnType.IsValueType)
+                {
+                    Label retisnull = ilGenerator.DefineLabel();
+                    Label endofif = ilGenerator.DefineLabel();
+
+                    ilGenerator.Emit(OpCodes.Ldnull);
+                    ilGenerator.Emit(OpCodes.Ceq);
+                    ilGenerator.Emit(OpCodes.Brtrue_S, retisnull);
+                    ilGenerator.Emit(OpCodes.Ldloc_2);
+                    ilGenerator.Emit(OpCodes.Unbox_Any, mi.ReturnType);
+                    ilGenerator.Emit(OpCodes.Br_S, endofif);
+                    ilGenerator.MarkLabel(retisnull);
+                    ilGenerator.Emit(OpCodes.Ldtoken, mi.ReturnType);
+                    ilGenerator.EmitCall(OpCodes.Call, getTypeFromHandleMethodInfo, null);
+                    ilGenerator.EmitCall(OpCodes.Call, activatorCreateInstanceMethodInfo, null);
+                    ilGenerator.Emit(OpCodes.Unbox_Any, mi.ReturnType);
+                    ilGenerator.MarkLabel(endofif);
+                }
+            }
+            //C#: return ret
+            ilGenerator.Emit(OpCodes.Ret);
+
         }
 
         private void EmitPropertyGet(ILGenerator ilGenerator, PropertyInfo propertyInfo)
