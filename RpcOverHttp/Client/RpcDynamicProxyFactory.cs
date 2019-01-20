@@ -514,7 +514,10 @@ namespace RpcOverHttp
 
         protected override void Dispose(bool disposing)
         {
-            clientWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "dispose", CancellationToken.None).Wait();
+            if (clientWebSocket.State != WebSocketState.None)
+            {
+                clientWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "dispose", CancellationToken.None).Wait();
+            }
             base.Dispose(disposing);
         }
         protected override bool TryInvokeEventHandler(Type interfaceType, Type handlerType, string name, object[] args, out object resul)

@@ -106,7 +106,7 @@ namespace DynamicProxyImplementation
                     ret = tb.CreateType();
 
                     dynamicTypes.Add(typeName, ret);
-                    this.ab.Save(this.dllName);
+                    //this.ab.Save(this.dllName);
                 }
             }
             finally

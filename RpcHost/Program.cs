@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.IO;
 using RpcOverHttp.WebHost;
 using System.Diagnostics;
+using System.Net;
 
 namespace RpcHost
 {

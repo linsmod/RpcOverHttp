@@ -35,7 +35,7 @@ namespace RpcServiceCollection
             if (SampleFuncEvent != null)
             {
                 var num = SampleFuncEvent.Invoke("hello world");
-                Console.WriteLine("test SampleFuncEvent remote handle ok");
+                Console.WriteLine("test SampleFuncEvent remote handle ok, return " + num);
             }
             if (SampleActionEvent != null)
             {

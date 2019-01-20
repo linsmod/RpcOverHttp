@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace RpcOverHttp.SelfHost
@@ -20,13 +21,28 @@ namespace RpcOverHttp.SelfHost
 
         public void AcceptWebSocket(Func<IRpcWebSocketContext, Task> userFunc)
         {
+            Console.WriteLine("a ws client connected.");
             var wsctx = new SystemNetWebSocketContext(ctx.AcceptWebSocketAsync(null).Result);
-            Task.Factory.StartNew(async (state) =>
+            //ThreadPool.QueueUserWorkItem(async (state) =>
+            //{
+            //    var func = state as Func<IRpcWebSocketContext, Task>;
+            //    await userFunc(wsctx);
+            //    Console.WriteLine("a ws client disconnected.");
+            //}, userFunc);
+            new Thread(async (state) =>
             {
                 var func = state as Func<IRpcWebSocketContext, Task>;
                 await userFunc(wsctx);
                 Console.WriteLine("a ws client disconnected.");
-            }, userFunc);
+            })
+            {
+                IsBackground = true,
+                Name = "WebSocketHandlerThread"
+            }.Start(userFunc);
+            //Task.Factory.StartNew(async (state) =>
+            //{
+
+            //}, userFunc);
         }
 
         public bool IsWebSocketRequest

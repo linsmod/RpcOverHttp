@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Reflection;
+using System.Collections.Concurrent;
 
 namespace DynamicProxyImplementation
 {
     internal static class TypeHelper
     {
-        private static Dictionary<string, object> _localCacheGetMethodInfoCustomAttributes = new Dictionary<string,object>();
-        private static Dictionary<string, object> localCacheGetMethodInfoCustomAttributes
+        private static ConcurrentDictionary<string, object> _localCacheGetMethodInfoCustomAttributes = new ConcurrentDictionary<string,object>();
+        private static ConcurrentDictionary<string, object> localCacheGetMethodInfoCustomAttributes
         {
             get
             {
@@ -17,8 +18,8 @@ namespace DynamicProxyImplementation
             }
         }
 
-        private static Dictionary<string, object> _localCacheIsSubclassOf = new Dictionary<string, object>();
-        private static Dictionary<string, object> localCacheIsSubclassOf
+        private static ConcurrentDictionary<string, object> _localCacheIsSubclassOf = new ConcurrentDictionary<string, object>();
+        private static ConcurrentDictionary<string, object> localCacheIsSubclassOf
         {
             get
             {
@@ -26,8 +27,8 @@ namespace DynamicProxyImplementation
             }
         }
 
-        private static Dictionary<string, object> _localCacheIsImplementingInterface = new Dictionary<string, object>();
-        private static Dictionary<string, object> localCacheIsImplementingInterface
+        private static ConcurrentDictionary<string, object> _localCacheIsImplementingInterface = new ConcurrentDictionary<string, object>();
+        private static ConcurrentDictionary<string, object> localCacheIsImplementingInterface
         {
             get
             {
@@ -35,8 +36,8 @@ namespace DynamicProxyImplementation
             }
         }
 
-        private static Dictionary<string, object> _localCacheGetInterfaces = new Dictionary<string, object>();
-        private static Dictionary<string, object> localCacheGetInterfaces
+        private static ConcurrentDictionary<string, object> _localCacheGetInterfaces = new ConcurrentDictionary<string, object>();
+        private static ConcurrentDictionary<string, object> localCacheGetInterfaces
         {
             get
             {
@@ -44,8 +45,8 @@ namespace DynamicProxyImplementation
             }
         }
 
-        private static Dictionary<string, Tuple<bool, EventInfo>> _localCacheGetEventInfo = new Dictionary<string, Tuple<bool, EventInfo>>();
-        private static Dictionary<string, Tuple<bool, EventInfo>> localCacheGetEventInfo
+        private static ConcurrentDictionary<string, Tuple<bool, EventInfo>> _localCacheGetEventInfo = new ConcurrentDictionary<string, Tuple<bool, EventInfo>>();
+        private static ConcurrentDictionary<string, Tuple<bool, EventInfo>> localCacheGetEventInfo
         {
             get
             {
@@ -53,8 +54,8 @@ namespace DynamicProxyImplementation
             }
         }
 
-        private static Dictionary<string, Tuple<bool, EventInfo>> _localCacheHasEvent = new Dictionary<string, Tuple<bool, EventInfo>>();
-        private static Dictionary<string, Tuple<bool, EventInfo>> localCacheHasEvent
+        private static ConcurrentDictionary<string, Tuple<bool, EventInfo>> _localCacheHasEvent = new ConcurrentDictionary<string, Tuple<bool, EventInfo>>();
+        private static ConcurrentDictionary<string, Tuple<bool, EventInfo>> localCacheHasEvent
         {
             get
             {
@@ -62,16 +63,16 @@ namespace DynamicProxyImplementation
             }
         }
 
-        private static Dictionary<string, Tuple<bool, MethodInfo>> _localCacheGetMethodInfo = new Dictionary<string, Tuple<bool, MethodInfo>>();
-        private static Dictionary<string, Tuple<bool, MethodInfo>> localCacheGetMethodInfo
+        private static ConcurrentDictionary<string, Tuple<bool, MethodInfo>> _localCacheGetMethodInfo = new ConcurrentDictionary<string, Tuple<bool, MethodInfo>>();
+        private static ConcurrentDictionary<string, Tuple<bool, MethodInfo>> localCacheGetMethodInfo
         {
             get
             {
                 return _localCacheGetMethodInfo;
             }
         }
-        private static Dictionary<string, Tuple<bool, PropertyInfo>> _localCacheGetPropertyInfo = new Dictionary<string, Tuple<bool, PropertyInfo>>();
-        private static Dictionary<string, Tuple<bool, PropertyInfo>> localCacheGetPropertyInfo
+        private static ConcurrentDictionary<string, Tuple<bool, PropertyInfo>> _localCacheGetPropertyInfo = new ConcurrentDictionary<string, Tuple<bool, PropertyInfo>>();
+        private static ConcurrentDictionary<string, Tuple<bool, PropertyInfo>> localCacheGetPropertyInfo
         {
             get
             {
@@ -128,7 +129,7 @@ namespace DynamicProxyImplementation
                     }
                 }
 
-                localCacheIsImplementingInterface.Add(cacheKey, ret);
+                localCacheIsImplementingInterface.TryAdd(cacheKey, ret);
             }
             else
             {
@@ -190,7 +191,7 @@ namespace DynamicProxyImplementation
                     }
                 }
 
-                localCacheIsSubclassOf.Add(cacheKey, ret);
+                localCacheIsSubclassOf.TryAdd(cacheKey, ret);
             }
             else
             {
@@ -221,7 +222,7 @@ namespace DynamicProxyImplementation
             {
                 ret = GetEventInfoInInterfaces(type, eventName);
                 item = new Tuple<bool, EventInfo>((ret != null), ret);
-                localCacheGetEventInfo.Add(cacheKey, item);
+                localCacheGetEventInfo.TryAdd(cacheKey, item);
             }
             else
             {
@@ -307,7 +308,7 @@ namespace DynamicProxyImplementation
                 EventInfo ei = GetEventInfoInInterfaces(type, eventName);
                 ret = ei != null;
                 item = new Tuple<bool, EventInfo>(ret, ei);
-                localCacheHasEvent.Add(cacheKey, item);
+                localCacheHasEvent.TryAdd(cacheKey, item);
             }
             else
             {
@@ -451,7 +452,7 @@ namespace DynamicProxyImplementation
                 }
 
                 item = new Tuple<bool, MethodInfo>((ret != null), ret);
-                localCacheGetMethodInfo.Add(cacheKey, item);
+                localCacheGetMethodInfo.TryAdd(cacheKey, item);
             }
             else
             {
@@ -575,7 +576,7 @@ namespace DynamicProxyImplementation
                     }
                 }
                 item = new Tuple<bool, PropertyInfo>((ret != null), ret);
-                localCacheGetPropertyInfo.Add(cacheKey, item);
+                localCacheGetPropertyInfo.TryAdd(cacheKey, item);
             }
             else
             {

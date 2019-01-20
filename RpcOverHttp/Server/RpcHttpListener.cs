@@ -53,7 +53,8 @@ namespace RpcOverHttp
                         }
                         else
                         {
-                            Task.Factory.StartNew(new Action<object>(rpcServer.ProcessRequestInternal), ctx);
+                            new Thread(rpcServer.ProcessRequestInternal) { Name = "HttpRequestHandlerThread", IsBackground = true }.Start(ctx);
+                            //Task.Factory.StartNew(new Action<object>(rpcServer.ProcessRequestInternal), ctx);
                         }
                     }
                     catch (Exception ex)

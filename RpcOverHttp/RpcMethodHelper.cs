@@ -90,25 +90,5 @@ namespace RpcOverHttp
             else
                 return retVal;
         }
-
-        private static Delegate CreateEventHandler(MethodInfo method)
-        {
-            if (method.ReturnType == typeof(void))
-            {
-                var plist = method.GetParameters();
-                var pType = plist[0].ParameterType;
-                if (pType.FullName == "System.MulticastDelegate")
-                {
-                    AssemblyName assemblyName = new AssemblyName(Guid.NewGuid().ToString());
-                    AssemblyBuilder ab = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave);
-                    var moduleBuilder = ab.DefineDynamicModule(assemblyName.Name, string.Concat(assemblyName.Name, ".dll"));
-                }
-            }
-            else
-            {
-
-            }
-            throw new NotImplementedException();
-        }
     }
 }
