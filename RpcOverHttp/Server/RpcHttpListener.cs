@@ -33,15 +33,17 @@ namespace RpcOverHttp
             impls = itfTypes.Select(x => iocContainer.Resolve(x));
             implTypes = impls.Select(x => x.GetType());
         }
-
+        bool stopRequested;
         public void Start(string urlPrefix)
         {
+            httpListener = null;
+            httpListener = new HttpListener();
             httpListener.AuthenticationSchemes = AuthenticationSchemes.Anonymous;
             httpListener.Prefixes.Add(urlPrefix);
             httpListener.Start();
             new Thread(new ThreadStart(delegate
             {
-                while (true)
+                while (!stopRequested)
                 {
                     try
                     {
@@ -68,9 +70,8 @@ namespace RpcOverHttp
 
         internal void Stop()
         {
+            stopRequested = true;
             this.httpListener.Stop();
         }
-
-
     }
 }
