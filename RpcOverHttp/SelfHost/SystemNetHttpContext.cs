@@ -32,7 +32,14 @@ namespace RpcOverHttp.SelfHost
             new Thread(async (state) =>
             {
                 var func = state as Func<IRpcWebSocketContext, Task>;
-                await userFunc(wsctx);
+                try
+                {
+                    await userFunc(wsctx);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.ToString());
+                }
                 Console.WriteLine("a ws client disconnected.");
             })
             {

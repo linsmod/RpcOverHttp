@@ -51,7 +51,6 @@ namespace RpcOverHttp
     internal class RpcOverHttpDaynamicProxy : DynamicProxy
     {
         internal string token;
-        bool wsconnected = false;
         ClientWebSocket clientWebSocket = new ClientWebSocket();
         private object wsLock = new object();
         RpcDynamicProxyFactory factory;
@@ -383,7 +382,7 @@ namespace RpcOverHttp
         /// <summary>
         /// key = interface.method + . + eventhandler.method
         /// </summary>
-        Dictionary<RemoteEventSubscription, MethodInfo> subscriptions = new Dictionary<RemoteEventSubscription, MethodInfo>();
+        Dictionary<RemoteEventSubscription, Delegate> subscriptions = new Dictionary<RemoteEventSubscription, Delegate>();
 
         private async Task EventListenerThread()
         {
@@ -404,17 +403,17 @@ namespace RpcOverHttp
                     inputms.Read(keyBytes, 0, keyBytes.Length);
                     var eventKey = BitConverter.ToInt32(keyBytes, 0);
                     var key = this.subscriptions.Keys.Single(x => x == eventKey);
-                    var handlerMethod = this.subscriptions[key];
+                    var d = this.subscriptions[key];
                     //the server will change a object sender to a string when process a eventhandler call. the string value is "<service-instance>"
                     //we should fix
-                    var argTypes = handlerMethod.GetParameters().Select(x => x.ParameterType).ToArray();
+                    var argTypes = d.Method.GetParameters().Select(x => x.ParameterType).ToArray();
                     var fixup = this.FixupRemoteEventHandlerSenderType(argTypes);
                     var arguments = serializer.Deserialize(inputms, argTypes);
 
                     IRpcEventHandleResult result =
-                        handlerMethod.ReturnType == typeof(void) ?
+                        d.Method.ReturnType == typeof(void) ?
                         new RpcEventHandleResultVoid() :
-                        Activator.CreateInstance(typeof(RpcEventHandleResultGeneral<>).MakeGenericType(handlerMethod.ReturnType)) as IRpcEventHandleResult;
+                        Activator.CreateInstance(typeof(RpcEventHandleResultGeneral<>).MakeGenericType(d.Method.ReturnType)) as IRpcEventHandleResult;
 
                     object retVal = null;
                     try
@@ -423,7 +422,8 @@ namespace RpcOverHttp
                         {
                             this.FixupRemoteEventHandlerSenderValue(arguments);
                         }
-                        retVal = handlerMethod.Invoke(this, arguments);
+                        Debugger.Break();
+                        retVal = d.Method.Invoke(d.Target, arguments);
                         result.Value = retVal;
                     }
                     catch (Exception ex)
@@ -457,14 +457,14 @@ namespace RpcOverHttp
         protected override bool TrySetEvent(Type interfaceType, string name, object value, bool add)
         {
             EventInfo e = TypeHelper.GetEventInfo(interfaceType, name);
-            if (!wsconnected)
+            if (clientWebSocket.State != WebSocketState.Open)
             {
                 lock (wsLock)
                 {
-                    if (!wsconnected)
+                    if (clientWebSocket.State != WebSocketState.Open)
                     {
+                        clientWebSocket = new ClientWebSocket();
                         clientWebSocket.ConnectAsync(new Uri(this.factory.websocketServer + "?instanceId=" + this.instanceId), CancellationToken.None).Wait();
-                        wsconnected = true;
                         Task.Factory.StartNew(EventListenerThread);
                     }
                 }
@@ -474,7 +474,7 @@ namespace RpcOverHttp
             {
                 lock (subscriptions)
                 {
-                    var key = AddSubscription(interfaceType, name, (value as Delegate).Method);
+                    var key = AddSubscription(interfaceType, name, value as Delegate);
                     object result;
                     this.TryInvokeMember(interfaceType, e.AddMethod.MetadataToken, true, new object[] { key }, out result);
                 }
@@ -483,25 +483,25 @@ namespace RpcOverHttp
             {
                 lock (subscriptions)
                 {
-                    var key = RemoveSubscription(interfaceType, name, (value as Delegate).Method);
+                    var key = RemoveSubscription(interfaceType, name, value as Delegate);
                     object result;
                     this.TryInvokeMember(interfaceType, e.RemoveMethod.MetadataToken, true, new object[] { key }, out result);
                 }
             }
             return true;
         }
-        private RemoteEventSubscription AddSubscription(Type interfaceType, string eventName, MethodInfo eventHandlerMethod)
+        private RemoteEventSubscription AddSubscription(Type interfaceType, string eventName, Delegate d)
         {
-            var key = new RemoteEventSubscription(this.instanceId, interfaceType, eventName, eventHandlerMethod);
+            var key = new RemoteEventSubscription(this.instanceId, interfaceType, eventName, d);
             var idk = BitConverter.GetBytes(key.GetHashCode());
             if (!subscriptions.ContainsKey(key))
-                subscriptions.Add(key, eventHandlerMethod);
+                subscriptions.Add(key, d);
             return key;
         }
 
-        private RemoteEventSubscription RemoveSubscription(Type interfaceType, string eventName, MethodInfo eventHandlerMethod)
+        private RemoteEventSubscription RemoveSubscription(Type interfaceType, string eventName, Delegate d)
         {
-            var key = new RemoteEventSubscription(this.instanceId, interfaceType, eventName, eventHandlerMethod);
+            var key = new RemoteEventSubscription(this.instanceId, interfaceType, eventName, d);
             var idk = BitConverter.GetBytes(key.GetHashCode());
             subscriptions.Remove(key);
             return key;

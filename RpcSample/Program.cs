@@ -40,7 +40,7 @@ namespace RpcSample
         static void Main(string[] args)
         {
             ServicePointManager.DefaultConnectionLimit = 1024;
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 1; i++)
             {
                 new Thread((state) =>
                 {
@@ -53,6 +53,9 @@ namespace RpcSample
                         client.ServerCertificateValidationCallback = (a, b, c, d) => true;
                         var sample = client.Rpc<IRpcServiceSample>();
 
+                        sample.SampleActionEventDiffThread += Sample_SampleActionEventDiffThread;
+                        sample.TestRemoteEventHandlerDiffThread();
+                        Thread.Sleep(-1);
                         //remote event handler test
                         sample.SampleFuncEvent += Sample_SampleFuncEvent;
                         sample.SampleActionEvent += Sample_SampleActionEvent;
@@ -128,6 +131,9 @@ namespace RpcSample
             Console.ReadLine();
         }
 
-
+        private static void Sample_SampleActionEventDiffThread(object sender, string e)
+        {
+            Console.WriteLine(e);
+        }
     }
 }

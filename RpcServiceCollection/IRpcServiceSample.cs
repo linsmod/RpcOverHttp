@@ -6,6 +6,7 @@ namespace RpcServiceCollection
 {
     public interface IRpcServiceSample
     {
+        event EventHandler<string> SampleActionEventDiffThread;
         event Func<string, int> SampleFuncEvent;
         event EventHandler SimpleEvent;
         event EventHandler<string> SampleActionEvent;
@@ -19,5 +20,6 @@ namespace RpcServiceCollection
         Task<string> TestRemoteAsyncTaskWithResult();
         void UploadStream(Stream stream, string fileName);
         Stream DownloadStream(string fileName);
+        void TestRemoteEventHandlerDiffThread();
     }
 }

@@ -176,12 +176,20 @@ namespace RpcOverHttp
 
         private void FixupEventHandlerSender(RpcEvent msg)
         {
+            Debugger.Break();
             for (int i = 0; i < msg.Arguments.Length; i++)
             {
                 var item = msg.Arguments[i];
                 if (item != null && typeof(IRpcService).IsAssignableFrom(item.GetType()))
                 {
                     msg.Arguments[i] = "<service_instance>";
+                }
+                else if (item != null && i == 0 && msg.ArgumentTypes[i] == typeof(object))
+                {
+                    if (item.GetType().GetInterfaces().Any())
+                    {
+                        msg.Arguments[i] = "<service_instance>";
+                    }
                 }
             }
         }
@@ -395,7 +403,7 @@ namespace RpcOverHttp
                                                 var thunkHandler = instanceType.GetMethod(hanlderName);
 
                                                 var clientHandlerId = (int)args[0]; /*event callback id of client*/
-                                                //event register/unregister
+                                                                                    //event register/unregister
                                                 if (op.EventKind == RpcEventKind.Add)
                                                 {
                                                     EventHub.AddEventHandler(e, impl, head.InstanceId, thunkHandler, clientHandlerId);

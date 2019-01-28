@@ -22,6 +22,7 @@ namespace RpcOverHttp.Server
             return factory.CreateDynamicProxy(interfaceType, this, instance, instanceId, server);
         }
     }
+
     internal class ThunkImplementation : DynamicProxy, IRpcService
     {
         private ThunkImplementationFactory factory;
@@ -86,20 +87,23 @@ namespace RpcOverHttp.Server
             rpcEvent.ReturnType = method.ReturnType;
 
             //control only invoking the matched event hander registeration
-            if (RpcHead.Current.InstanceId != this.instanceId)
+            if (RpcHead.Current != null && RpcHead.Current.InstanceId != this.instanceId)
             {
                 result = null;
                 return false;
             }
-            if (!EventHub.hanlderMap.TryGetValue(RpcHead.Current.InstanceId + "." + name, out EventHubItem item))
+            EventHubItem item;
+            if (!EventHub.hanlderMap.TryGetValue(this.instanceId + "." + name, out item))
             {
-                throw new Exception("can not found the client handler.");
+                throw new Exception(string.Format("can not find the client handler on instance {0}.", this.instanceId));
             }
             rpcEvent.handlerId = item.callbackIds[0];
             //rpcEvent.handlerId = item.callbackIds[0];
             BlockingQueue<RpcEvent> queue;
-            server.eventMessages.TryGetValue(RpcHead.Current.InstanceId, out queue);
-
+            if (!server.eventMessages.TryGetValue(this.instanceId, out queue))
+            {
+                throw new Exception(string.Format("can not find the message queue on instance {0}", this.instanceId));
+            }
             queue.Enqueue(rpcEvent);
             var invokeResult = rpcEvent.WaitResult(120 * 1000);
             if (invokeResult.Error != null)

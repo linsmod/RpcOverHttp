@@ -19,10 +19,21 @@ namespace RpcServiceCollection
         public event Func<string, int> SampleFuncEvent;
         public event EventHandler SimpleEvent;
         public event EventHandler<string> SampleActionEvent;
-
+        public event EventHandler<string> SampleActionEventDiffThread;
         public override RpcIdentity Authroize(string token)
         {
             return base.Authroize(token);
+        }
+
+        public void TestRemoteEventHandlerDiffThread()
+        {
+            Task.Delay(5000).ContinueWith((t) =>
+            {
+                if (SampleActionEventDiffThread != null)
+                {
+                    SampleActionEventDiffThread.Invoke(this, "invoke from a task");
+                }
+            });
         }
 
         public void TestRemoteEventHandler()

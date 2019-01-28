@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Threading;
 using System.Diagnostics;
 using System.Security.Policy;
+using RpcOverHttp.Internal;
 
 namespace DynamicProxyImplementation
 {
@@ -38,8 +39,8 @@ namespace DynamicProxyImplementation
             listToArrayMethodInfo = TypeHelper.GetMethodInfo(typeof(List<object>), listToArrayMethodName, Type.EmptyTypes);
 
             getTypeFromHandleMethodInfo = TypeHelper.GetMethodInfo(typeof(Type), getTypeFromHandleMethodName, new Type[] { typeof(RuntimeTypeHandle) });
-            delegateCombineMethodInfo = TypeHelper.GetMethodInfo(typeof(Delegate), delegateCombineMethodName, new Type[] { typeof(Delegate), typeof(Delegate) });
-            delegateRemoveMethodInfo = TypeHelper.GetMethodInfo(typeof(Delegate), delegateRemoveMethodName, new Type[] { typeof(Delegate), typeof(Delegate) });
+            delegateCombineMethodInfo = TypeHelper.GetMethodInfo(typeof(DelegateHelper), nameof(DelegateHelper.InstanceCombine), new Type[] { typeof(Delegate), typeof(Delegate) });
+            delegateRemoveMethodInfo = TypeHelper.GetMethodInfo(typeof(DelegateHelper), nameof(DelegateHelper.InstanceRemove), new Type[] { typeof(Delegate), typeof(Delegate) });
             activatorCreateInstanceMethodInfo = TypeHelper.GetMethodInfo(typeof(Activator), createInstanceMethodName, new Type[] { typeof(Type) });
         }
 
@@ -50,8 +51,6 @@ namespace DynamicProxyImplementation
         private string listAddMethodName = ExpressionHelper.GetMethodCallExpressionMethodInfo<List<object>>(l => l.Add(new object())).Name;
         private string listToArrayMethodName = ExpressionHelper.GetMethodCallExpressionMethodInfo<List<object>>(l => l.ToArray()).Name;
         private string createInstanceMethodName = ExpressionHelper.GetMethodCallExpressionMethodInfo<object>(a => Activator.CreateInstance(a.GetType())).Name;
-        private string delegateCombineMethodName = ExpressionHelper.GetMethodCallExpressionMethodInfo<Delegate>(d => Delegate.Combine(d, d)).Name;
-        private string delegateRemoveMethodName = ExpressionHelper.GetMethodCallExpressionMethodInfo<Delegate>(d => Delegate.Remove(d, d)).Name;
 
         private MethodInfo listAddMethodInfo = null;
         private MethodInfo listToArrayMethodInfo = null;
@@ -102,7 +101,7 @@ namespace DynamicProxyImplementation
                     CreateConstructorBaseCalls(dynamicProxyBaseType, tb);
 
                     DynamicImplementInterface(new List<Type> { interfaceType }, new List<string>(), interfaceType, tb);
-                    
+
                     ret = tb.CreateType();
 
                     dynamicTypes.Add(typeName, ret);
@@ -301,9 +300,14 @@ namespace DynamicProxyImplementation
             //C#: Type.GetTypeFromHandle(interfaceType)
             EmitAndStoreGetTypeFromHandle(ilGenerator, eventInfo.DeclaringType, OpCodes.Stloc_0);
 
-            //C#: Delegate.Combine(eventHandler, value)
+
+            //C#: DelegateHelper.Combine(instanceId, eventHandler, value)
+            //C#: Delegate.Combine(eventHandler, value) 
             ilGenerator.Emit(OpCodes.Ldarg_0);
-            ilGenerator.Emit(OpCodes.Ldarg_0);
+
+            //ilGenerator.Emit(OpCodes.Ldarg_0);//this.
+            //ilGenerator.Emit(OpCodes.Ldfld, instanceIdField);
+            ilGenerator.Emit(OpCodes.Ldarg_0);//this.
             ilGenerator.Emit(OpCodes.Ldfld, eventField);
             ilGenerator.Emit(OpCodes.Ldarg_1);
             ilGenerator.EmitCall(OpCodes.Call, delegateCombineMethodInfo, null);
@@ -336,8 +340,10 @@ namespace DynamicProxyImplementation
             EmitAndStoreGetTypeFromHandle(ilGenerator, eventInfo.DeclaringType, OpCodes.Stloc_0);
 
             //C#: Delegate.Remove(eventHandler, value)
-            ilGenerator.Emit(OpCodes.Ldarg_0);
-            ilGenerator.Emit(OpCodes.Ldarg_0);
+            ilGenerator.Emit(OpCodes.Ldarg_0);//this
+            //ilGenerator.Emit(OpCodes.Ldarg_0);//this.
+            //ilGenerator.Emit(OpCodes.Ldfld, instanceIdField);
+            ilGenerator.Emit(OpCodes.Ldarg_0);//this.
             ilGenerator.Emit(OpCodes.Ldfld, eventField);
             ilGenerator.Emit(OpCodes.Ldarg_1);
             ilGenerator.EmitCall(OpCodes.Call, delegateRemoveMethodInfo, null);
@@ -373,9 +379,8 @@ namespace DynamicProxyImplementation
                     usedNames.Add(eventInfo.Name);
                 }
 
-                EventBuilder eb = tb.DefineEvent(eventInfo.Name, eventInfo.Attributes, eventInfo.EventHandlerType);
-                FieldBuilder ef = tb.DefineField(string.Concat("_", eventInfo.Name), eventInfo.EventHandlerType, FieldAttributes.Private);
-
+                EventBuilder eb = tb.DefineEvent(eventInfo.Name, eventInfo.Attributes, eventInfo.EventHandlerType);//loc.0
+                FieldBuilder ef = tb.DefineField(string.Concat("_", eventInfo.Name), eventInfo.EventHandlerType, FieldAttributes.Private);//loc.1
                 //add
                 {
                     MethodInfo addMethodInfo = eventInfo.GetAddMethod();
@@ -421,7 +426,7 @@ namespace DynamicProxyImplementation
             EmitAndStoreGetTypeFromHandle(ilGenerator, eventInfo.DeclaringType, OpCodes.Stloc_0);
 
 
-           
+
             //C#: params = new List<object>()
             ilGenerator.Emit(OpCodes.Newobj, typeof(List<object>).GetConstructor(Type.EmptyTypes));
             ilGenerator.Emit(OpCodes.Stloc_1);
@@ -444,7 +449,7 @@ namespace DynamicProxyImplementation
             //C#: ret = DynamicProxy.InvokeEventHandler(interfaceType, method, name, params, out result)
             ilGenerator.Emit(OpCodes.Ldarg_0);//this
             ilGenerator.Emit(OpCodes.Ldloc_0);//interfaceType
-            
+
             //C#: Type.GetTypeFromHandle(interfaceType)
             EmitAndStoreGetTypeFromHandle(ilGenerator, eventInfo.EventHandlerType, OpCodes.Stloc_0);
 
