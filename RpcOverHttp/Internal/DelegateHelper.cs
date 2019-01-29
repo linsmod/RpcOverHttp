@@ -43,6 +43,7 @@ namespace RpcOverHttp.Internal
             }
             return retVal;
         }
+
         [MethodImpl(MethodImplOptions.Synchronized)]
         public static Delegate InstanceRemove(Delegate source, Delegate value)
         {

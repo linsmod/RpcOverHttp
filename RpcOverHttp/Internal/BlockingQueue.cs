@@ -33,11 +33,13 @@ namespace RpcOverHttp.Internal
         // Either when there is an item in the queue
         // or when the reader thread is exiting.
         private WaitHandle[] mWaitHandles;
-
-        public BlockingQueue(CancellationToken cancellationToken)
+        public BlockingQueue()
+        {
+            mWaitHandles = new WaitHandle[2] { mSemaphore, mKillThread };
+        }
+        public BlockingQueue(CancellationToken cancellationToken) : this()
         {
             cancellationToken.Register(ReleaseReader);
-            mWaitHandles = new WaitHandle[2] { mSemaphore, mKillThread };
         }
         public void Enqueue(T data)
         {
@@ -46,6 +48,7 @@ namespace RpcOverHttp.Internal
             // because we just put an item
             // into the queue.
             mSemaphore.Release();
+            //Console.WriteLine("message is queued at " + DateTime.Now);
         }
 
         public bool Any()
@@ -76,7 +79,11 @@ namespace RpcOverHttp.Internal
             lock (mQueue)
             {
                 if (mQueue.Count > 0)
-                    return mQueue.Dequeue();
+                {
+                    var d = mQueue.Dequeue();
+                    //Console.WriteLine("message is dequeued at " + DateTime.Now);
+                    return d;
+                }
             }
             return default(T);
         }

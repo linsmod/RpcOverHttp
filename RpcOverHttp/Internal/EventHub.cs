@@ -35,7 +35,8 @@ namespace RpcOverHttp.Internal
             }
             else
             {
-                hubItem.callbackIds.Add(clientHandlerId);
+                throw new Exception("the subscription to a event can only be add once. unsubscribe first if resubscribe.");
+                //hubItem.callbackIds.Add(clientHandlerId);
             }
         }
 

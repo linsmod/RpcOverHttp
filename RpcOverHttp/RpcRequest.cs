@@ -75,7 +75,7 @@ namespace RpcOverHttp
                 EventName = p[1]
             };
         }
-        internal static ThreadLocal<RpcHead> _provider=new ThreadLocal<RpcHead>();
+        internal static ThreadLocal<RpcHead> _provider = new ThreadLocal<RpcHead>();
         public static RpcHead Current
         {
             get
@@ -175,6 +175,13 @@ namespace RpcOverHttp
     /// </summary>
     internal class RpcEvent
     {
+        public static RpcEvent Empty = new RpcEvent(true);
+        public RpcEvent() : this(false) { }
+        private RpcEvent(bool empty)
+        {
+            if (!empty)
+                waitHandle = new AutoResetEvent(false);
+        }
         public Type[] ArgumentTypes { get; internal set; }
         public object[] Arguments { get; internal set; }
         public Type ReturnType { get; internal set; }

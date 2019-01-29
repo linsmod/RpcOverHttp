@@ -20,7 +20,6 @@ namespace RpcOverHttp.WebHost
             this.ctx = ctx;
         }
 
-        Func<Func<AspNetWebSocketContext, Task>, AspNetWebSocketContext> x;
 
         public void AcceptWebSocket(Func<IRpcWebSocketContext, Task> userFunc)
         {

@@ -36,11 +36,15 @@ namespace RpcOverHttp.SelfHost
                 {
                     await userFunc(wsctx);
                 }
+                catch (AggregateException ex)
+                {
+                    Console.WriteLine(ex.InnerException.ToString());
+                }
                 catch (Exception ex)
                 {
                     Console.WriteLine(ex.ToString());
                 }
-                Console.WriteLine("a ws client disconnected.");
+                Console.WriteLine("[WebSocketHandlerThread] a ws client disconnected.");
             })
             {
                 IsBackground = true,

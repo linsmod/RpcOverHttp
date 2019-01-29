@@ -60,6 +60,7 @@ namespace RpcOverHttp
             itfTypes = iocContainer.RegisteredTypes.Select(x => x.Type);
             impls = itfTypes.Select(x => iocContainer.Resolve(x));
             implTypes = impls.Select(x => x.GetType());
+            new Thread(WsActiveDetection) { IsBackground = true, Name = "WsActiveDetection" }.Start();
         }
 
         /// <summary>
@@ -96,6 +97,23 @@ namespace RpcOverHttp
 
         }
 
+        private void WsActiveDetection()
+        {
+            while (!stopRequested)
+            {
+                var keys = eventMessages.Keys.ToList();
+                foreach (var item in keys)
+                {
+                    BlockingQueue<RpcEvent> messages;
+                    if (eventMessages.TryGetValue(item, out messages))
+                    {
+                        messages.Enqueue(RpcEvent.Empty); // for detection
+                    }
+                }
+                Thread.Sleep(5000);
+            }
+        }
+
         public async Task ProcessWebsocketRequest(IRpcWebSocketContext ctx)
         {
             WebSocket webSocket = ctx.WebSocket;
@@ -120,14 +138,46 @@ namespace RpcOverHttp
             //检查WebSocket状态
             while (webSocket.State == WebSocketState.Open)
             {
+                var msg = messages.Dequeue();
+                if (msg == null)
+                {
+                    if (webSocket.State == WebSocketState.Open)
+                    {
+                        webSocket.Abort();
+                    }
+                    break;
+                }
+                //Zero handler id for live detect
+                if (msg.handlerId == 0)
+                {
+                    if (webSocket.State != WebSocketState.Open)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                }
+                Console.WriteLine("message is dequeued at " + DateTime.Now);
+                IRpcEventHandleResult result = null;
+                if (msg.ReturnType == typeof(void))
+                {
+                    result = new RpcEventHandleResultVoid();
+                }
+                else
+                {
+                    var resultType = typeof(RpcEventHandleResultGeneral<>).MakeGenericType(msg.ReturnType);
+                    result = Activator.CreateInstance(resultType) as IRpcEventHandleResult;
+                }
+                if (webSocket.State != WebSocketState.Open)
+                {
+                    result.Error = new RpcError(string.Format("ws connection broken, instance = {0}, state = {1}", instanceId, webSocket.State), null);
+                    msg.SetResult(result);
+                    break;
+                }
                 try
                 {
-                    var msg = messages.Dequeue();
-                    if (msg == null)
-                    {
-                        await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "", cancellationToken);
-                        return;
-                    }
                     using (var mssend = new MemoryStream())
                     {
                         //response = eventKey + args
@@ -150,33 +200,30 @@ namespace RpcOverHttp
                         byte[] payloadData = receivedDataBuffer.Take(webSocketReceiveResult.Count).ToArray();
                         using (var msrecv = new MemoryStream(payloadData))
                         {
-                            IRpcEventHandleResult result = null;
-                            if (msg.ReturnType == typeof(void))
-                            {
-                                result = new RpcEventHandleResultVoid();
-                            }
-                            else
-                            {
-                                var resultType = typeof(RpcEventHandleResultGeneral<>).MakeGenericType(msg.ReturnType);
-                                result = Activator.CreateInstance(resultType) as IRpcEventHandleResult;
-                            }
                             object[] values = serializer.Deserialize(msrecv, new Type[] { result.GetType() });
-                            Console.WriteLine("notify server continue executing.");
                             msg.SetResult(values[0] as IRpcEventHandleResult);
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex.Message);
-                    throw;
+                    Console.WriteLine(ex);
+                    if (ex.InnerException != null)
+                    {
+                        result.Error = new RpcError(ex.InnerException.Message, ex.InnerException.StackTrace);
+                    }
+                    else
+                    {
+                        result.Error = new RpcError(ex.Message, ex.StackTrace);
+                    }
+                    msg.SetResult(result);
                 }
             }
+            Console.WriteLine(string.Format("disconnect ws connection on instance {0}", instanceId));
         }
 
         private void FixupEventHandlerSender(RpcEvent msg)
         {
-            Debugger.Break();
             for (int i = 0; i < msg.Arguments.Length; i++)
             {
                 var item = msg.Arguments[i];
@@ -196,6 +243,7 @@ namespace RpcOverHttp
 
         public void Stop()
         {
+            stopRequested = true;
             if (listener != null)
                 listener.Stop();
         }
@@ -274,6 +322,8 @@ namespace RpcOverHttp
         ThunkImplementationFactory thunkImplFactory = new ThunkImplementationFactory();
         SafeDictionary<Guid, object> instances = new SafeDictionary<Guid, object>();
         internal SafeDictionary<Guid, BlockingQueue<RpcEvent>> eventMessages = new SafeDictionary<Guid, BlockingQueue<RpcEvent>>();
+        private bool stopRequested;
+
         private void ProcessNormalRequest(IRpcHttpContext ctx, Stream outputStream)
         {
             RpcError error = new RpcError("rpc server error.", null);
@@ -395,15 +445,19 @@ namespace RpcOverHttp
                                             //execute the call
                                             if (head.EventOp)
                                             {
+                                                //Debugger.Break();
                                                 var op = head.GetEventOp();
                                                 //create a method as the event proxy
 
                                                 EventInfo e = TypeHelper.GetEventInfo(itfType, op.EventName);
                                                 var hanlderName = itfType.Name + "_" + op.EventName;
+
+                                                //thunkHandler is a proxy method will call DelegateHelper.
                                                 var thunkHandler = instanceType.GetMethod(hanlderName);
 
                                                 var clientHandlerId = (int)args[0]; /*event callback id of client*/
-                                                                                    //event register/unregister
+
+                                                //event register/unregister
                                                 if (op.EventKind == RpcEventKind.Add)
                                                 {
                                                     EventHub.AddEventHandler(e, impl, head.InstanceId, thunkHandler, clientHandlerId);
@@ -411,13 +465,17 @@ namespace RpcOverHttp
                                                 else
                                                 {
                                                     EventHub.RemoveEventHandler(e, impl, head.InstanceId, thunkHandler, clientHandlerId);
+                                                    BlockingQueue<RpcEvent> messages;
+                                                    if (this.eventMessages.TryGetValue(head.InstanceId, out messages))
+                                                    {
+                                                        //null for close the ws connection
+                                                        //Console.WriteLine("send null RpcEvent for close the ws connection on instance " + head.InstanceId);
+                                                        messages.Enqueue(null);
+                                                    }
                                                 }
                                             }
                                             else
                                             {
-                                                //retrive and store nessesery info.
-                                                //TODO
-
                                                 MethodInfo implMethod = RpcMethodHelper.FindImplMethod(itfType, itfMethod, instanceType);
                                                 returnVal = RpcMethodHelper.Invoke(itfType, itfMethod, impl, implMethod, head.EventOp, head.Timeout, head.Token, args);
                                             }

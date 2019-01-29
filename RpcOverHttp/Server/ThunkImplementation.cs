@@ -105,6 +105,8 @@ namespace RpcOverHttp.Server
                 throw new Exception(string.Format("can not find the message queue on instance {0}", this.instanceId));
             }
             queue.Enqueue(rpcEvent);
+            Console.WriteLine("message is queued at " + DateTime.Now);
+            Console.WriteLine();
             var invokeResult = rpcEvent.WaitResult(120 * 1000);
             if (invokeResult.Error != null)
             {

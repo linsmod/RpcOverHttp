@@ -386,55 +386,62 @@ namespace RpcOverHttp
 
         private async Task EventListenerThread()
         {
-            IRpcDataSerializer serializer;
-            if (!this.factory.iocContainer.TryResolve(out serializer))
-            {
-                serializer = this.factory.iocContainer.Resolve<IRpcDataSerializer>("default");
-            }
             const int maxMessageSize = 1024;
             var receivedDataBuffer = new ArraySegment<Byte>(new Byte[maxMessageSize]);
             while (clientWebSocket.State == WebSocketState.Open)
             {
                 var wsResult = await clientWebSocket.ReceiveAsync(receivedDataBuffer, CancellationToken.None);
-                using (var inputms = new MemoryStream(receivedDataBuffer.Take(wsResult.Count).ToArray()))
+                Console.WriteLine("recv ws message at " + DateTime.Now);
+                var d = receivedDataBuffer.Take(wsResult.Count).ToArray();
+                new Thread(async (object state) => await InvokeThread(state)) { IsBackground = true }.Start(d);
+            }
+        }
+
+        private async Task InvokeThread(object state)
+        {
+            IRpcDataSerializer serializer;
+            if (!this.factory.iocContainer.TryResolve(out serializer))
+            {
+                serializer = this.factory.iocContainer.Resolve<IRpcDataSerializer>("default");
+            }
+            var data = state as byte[];
+            using (var inputms = new MemoryStream(data))
+            {
+                //response = eventKey + arguments
+                var keyBytes = new byte[4];
+                inputms.Read(keyBytes, 0, keyBytes.Length);
+                var eventKey = BitConverter.ToInt32(keyBytes, 0);
+                var key = this.subscriptions.Keys.FirstOrDefault(x => x == eventKey);
+                var d = this.subscriptions[key];
+                //the server will change a object sender to a string when process a eventhandler call. the string value is "<service-instance>"
+                //we should fix
+                var argTypes = d.Method.GetParameters().Select(x => x.ParameterType).ToArray();
+                var fixup = this.FixupRemoteEventHandlerSenderType(argTypes);
+                var arguments = serializer.Deserialize(inputms, argTypes);
+
+                IRpcEventHandleResult result =
+                    d.Method.ReturnType == typeof(void) ?
+                    new RpcEventHandleResultVoid() :
+                    Activator.CreateInstance(typeof(RpcEventHandleResultGeneral<>).MakeGenericType(d.Method.ReturnType)) as IRpcEventHandleResult;
+                object retVal = null;
+                try
                 {
-                    //response = eventKey + arguments
-                    var keyBytes = new byte[4];
-                    inputms.Read(keyBytes, 0, keyBytes.Length);
-                    var eventKey = BitConverter.ToInt32(keyBytes, 0);
-                    var key = this.subscriptions.Keys.Single(x => x == eventKey);
-                    var d = this.subscriptions[key];
-                    //the server will change a object sender to a string when process a eventhandler call. the string value is "<service-instance>"
-                    //we should fix
-                    var argTypes = d.Method.GetParameters().Select(x => x.ParameterType).ToArray();
-                    var fixup = this.FixupRemoteEventHandlerSenderType(argTypes);
-                    var arguments = serializer.Deserialize(inputms, argTypes);
-
-                    IRpcEventHandleResult result =
-                        d.Method.ReturnType == typeof(void) ?
-                        new RpcEventHandleResultVoid() :
-                        Activator.CreateInstance(typeof(RpcEventHandleResultGeneral<>).MakeGenericType(d.Method.ReturnType)) as IRpcEventHandleResult;
-
-                    object retVal = null;
-                    try
+                    if (fixup)
                     {
-                        if (fixup)
-                        {
-                            this.FixupRemoteEventHandlerSenderValue(arguments);
-                        }
-                        Debugger.Break();
-                        retVal = d.Method.Invoke(d.Target, arguments);
-                        result.Value = retVal;
+                        this.FixupRemoteEventHandlerSenderValue(arguments);
                     }
-                    catch (Exception ex)
-                    {
-                        result.Error = RpcError.FromException(ex);
-                    }
-                    using (var outputms = new MemoryStream())
-                    {
-                        serializer.Serialize(outputms, new Type[] { result.GetType() }, new object[] { result });
-                        await clientWebSocket.SendAsync(new ArraySegment<byte>(outputms.ToArray()), WebSocketMessageType.Binary, true, CancellationToken.None);
-                    }
+                    Debugger.Break();
+                    retVal = d.Method.Invoke(d.Target, arguments);
+                    result.Value = retVal;
+                }
+                catch (Exception ex)
+                {
+                    result.Error = RpcError.FromException(ex);
+                }
+                using (var outputms = new MemoryStream())
+                {
+                    serializer.Serialize(outputms, new Type[] { result.GetType() }, new object[] { result });
+                    await clientWebSocket.SendAsync(new ArraySegment<byte>(outputms.ToArray()), WebSocketMessageType.Binary, true, CancellationToken.None);
                 }
             }
         }
@@ -463,7 +470,13 @@ namespace RpcOverHttp
                 {
                     if (clientWebSocket.State != WebSocketState.Open)
                     {
+                        if (clientWebSocket != null)
+                        {
+                            clientWebSocket.Abort();
+                        }
                         clientWebSocket = new ClientWebSocket();
+                        clientWebSocket.Options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+                        clientWebSocket.Options.AddSubProtocol("rpc");
                         clientWebSocket.ConnectAsync(new Uri(this.factory.websocketServer + "?instanceId=" + this.instanceId), CancellationToken.None).Wait();
                         Task.Factory.StartNew(EventListenerThread);
                     }
@@ -516,7 +529,16 @@ namespace RpcOverHttp
         {
             if (clientWebSocket.State != WebSocketState.None)
             {
-                clientWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "dispose", CancellationToken.None).Wait();
+                if (clientWebSocket.State != WebSocketState.Aborted)
+                    try
+                    {
+                        clientWebSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "dispose", CancellationToken.None).Wait();
+                    }
+                    catch (AggregateException ex)
+                    {
+                        //do nothing.
+                        Debug.WriteLine(ex.InnerException);
+                    }
             }
             base.Dispose(disposing);
         }
