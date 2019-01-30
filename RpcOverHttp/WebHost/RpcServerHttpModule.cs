@@ -13,7 +13,10 @@ namespace RpcOverHttp.WebHost
     {
         static IRpcServer server;
         static object lockObj = new object();
-        public RpcServerHttpHandler()
+        public abstract void InitRpcServer(IRpcServer server);
+        public bool IsReusable => true;
+
+        public void ProcessRequest(HttpContext context)
         {
             if (server == null)
             {
@@ -27,12 +30,6 @@ namespace RpcOverHttp.WebHost
                     }
                 }
             }
-        }
-        public abstract void InitRpcServer(IRpcServer server);
-        public bool IsReusable => true;
-
-        public void ProcessRequest(HttpContext context)
-        {
             IRpcHttpContext ctx = new WebHost.SystemWebHttpContext(context);
             if (!string.IsNullOrEmpty(ctx.Request.UserAgent)
                 && ctx.Request.UserAgent.IndexOf("RpcOverHttp", StringComparison.OrdinalIgnoreCase) != -1)
@@ -61,19 +58,25 @@ namespace RpcOverHttp.WebHost
     }
     public abstract class RpcServerHttpModule : IHttpModule
     {
+        RpcServerHttpHandler handler;
         public void Dispose()
         {
-        }
 
+        }
         public void Init(HttpApplication context)
         {
-            context.MapRequestHandler += Context_MapRequestHandler;
+            handler = new RpcServerHttpHandlerInternal(this);
+            context.AuthenticateRequest += Context_AuthenticateRequest;
         }
 
-        private void Context_MapRequestHandler(object sender, EventArgs e)
+        private void Context_AuthenticateRequest(object sender, EventArgs e)
         {
             var application = sender as HttpApplication;
-            application.Context.RemapHandler(new RpcServerHttpHandlerInternal(this));
+            if (application.Request.UserAgent!=null && application.Request.UserAgent.Contains("RpcClient"))
+            {
+                application.Response.ClearHeaders();
+                handler.ProcessRequest(application.Context);
+            }
         }
 
         public abstract void InitRpcServer(IRpcServer server);
