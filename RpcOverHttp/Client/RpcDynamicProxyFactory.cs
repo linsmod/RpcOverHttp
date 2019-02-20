@@ -1,5 +1,4 @@
 ﻿using DynamicProxyImplementation;
-using Newtonsoft.Json.Linq;
 using RpcOverHttp.Serialization;
 using System;
 using System.Collections.Generic;
@@ -7,7 +6,6 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Net;
 using System.Net.Http;
 using System.Net.Security;
@@ -180,11 +178,12 @@ namespace RpcOverHttp
                 serializer = this.factory.iocContainer.Resolve<IRpcDataSerializer>("default");
             }
             var argTypes = method.GetParameters().Select(x => x.ParameterType).ToArray();
+            var argNames = method.GetParameters().Select(x => x.Name).ToArray();
             if (request.EventOp)
             {
                 FixupRemoteEventKey(argTypes, request.Arguments);
             }
-            serializer.Serialize(writeStream, argTypes, request.Arguments);
+            serializer.Serialize(writeStream, argTypes, request.Arguments, argNames);
             writeStream.Flush();
             try
             {
@@ -335,7 +334,7 @@ namespace RpcOverHttp
                         {
                             try
                             {
-                                return serializer.Deserialize(response.ResponseStream, new Type[] { returnType.GenericTypeArguments[0] }).Single();
+                                return serializer.Deserialize(response.ResponseStream, new Type[] { returnType.GenericTypeArguments[0] }, new string[] { "p0" }).Single();
                             }
                             catch (Exception ex)
                             {
@@ -349,7 +348,7 @@ namespace RpcOverHttp
                     {
                         try
                         {
-                            return serializer.Deserialize(response.ResponseStream, new Type[] { returnType }).Single();
+                            return serializer.Deserialize(response.ResponseStream, new Type[] { returnType }, new string[] { "p0" }).Single();
                         }
                         catch (Exception ex)
                         {
@@ -416,8 +415,9 @@ namespace RpcOverHttp
                 //the server will change a object sender to a string when process a eventhandler call. the string value is "<service-instance>"
                 //we should fix
                 var argTypes = d.Method.GetParameters().Select(x => x.ParameterType).ToArray();
+                var argNames = d.Method.GetParameters().Select(x => x.Name).ToArray();
                 var fixup = this.FixupRemoteEventHandlerSenderType(argTypes);
-                var arguments = serializer.Deserialize(inputms, argTypes);
+                var arguments = serializer.Deserialize(inputms, argTypes, argNames);
 
                 IRpcEventHandleResult result =
                     d.Method.ReturnType == typeof(void) ?
@@ -440,7 +440,7 @@ namespace RpcOverHttp
                 }
                 using (var outputms = new MemoryStream())
                 {
-                    serializer.Serialize(outputms, new Type[] { result.GetType() }, new object[] { result });
+                    serializer.Serialize(outputms, new Type[] { result.GetType() }, new object[] { result }, new string[] { "p0" });
                     await clientWebSocket.SendAsync(new ArraySegment<byte>(outputms.ToArray()), WebSocketMessageType.Binary, true, CancellationToken.None);
                 }
             }

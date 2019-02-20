@@ -36,12 +36,6 @@ namespace RpcOverHttp.Serialization
     /// </summary>
     public interface IRpcDataSerializer
     {
-        void Serialize(Stream writeStream, Type[] types, object[] args);
-        object[] Deserialize(Stream readStream, Type[] types);
-    }
-
-    public interface IRpcDataSerializer2 : IRpcDataSerializer
-    {
         void Serialize(Stream writeStream, Type[] types, object[] args, string[] names);
         object[] Deserialize(Stream readStream, Type[] types, string[] names);
     }
@@ -51,7 +45,7 @@ namespace RpcOverHttp.Serialization
     /// </summary>
     public partial class ProtoBufRpcDataSerializer : IRpcDataSerializer
     {
-        public object[] Deserialize(Stream readStream, Type[] types)
+        public object[] Deserialize(Stream readStream, Type[] types,string[] names)
         {
             var reader = new BinaryReader(readStream);
             var argLenth = reader.ReadByte();
@@ -83,7 +77,7 @@ namespace RpcOverHttp.Serialization
             return args;
         }
 
-        public void Serialize(Stream writeStream, Type[] types, object[] args)
+        public void Serialize(Stream writeStream, Type[] types, object[] args, string[] names)
         {
             BinaryWriter writer = new BinaryWriter(writeStream);
             if (args.Length > byte.MaxValue)

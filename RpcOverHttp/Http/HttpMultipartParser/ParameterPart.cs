@@ -62,11 +62,6 @@ namespace HttpMultipartParser
         /// </summary>
         public string Data { get; private set; }
 
-        /// <summary>
-        ///     Gets or sets the name.
-        /// </summary>
-        public string Name { get; set; }
-
         #endregion
     }
 }

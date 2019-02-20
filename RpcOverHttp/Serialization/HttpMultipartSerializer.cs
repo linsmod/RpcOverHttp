@@ -6,18 +6,8 @@ using System.Text;
 
 namespace RpcOverHttp.Serialization
 {
-    class HttpMultipartSerializer : IRpcDataSerializer, IRpcDataSerializer2
+    class HttpMultipartSerializer : IRpcDataSerializer
     {
-        public object[] Deserialize(Stream readStream, Type[] types)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Serialize(Stream writeStream, Type[] types, object[] args)
-        {
-            throw new NotImplementedException();
-        }
-
         public void Serialize(Stream writeStream, Type[] types, object[] args, string[] names)
         {
             string boundary = "----RpcOverHttp" + DateTime.Now.Ticks.ToString("x");

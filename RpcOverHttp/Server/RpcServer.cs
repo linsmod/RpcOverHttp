@@ -4,17 +4,13 @@ using RpcOverHttp.Serialization;
 using RpcOverHttp.Server;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Net;
 using System.Net.WebSockets;
 using System.Reflection;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web;
 using TinyIoC;
 
 namespace RpcOverHttp
@@ -44,8 +40,7 @@ namespace RpcOverHttp
         public IAuthroizeHandler AuthroizeHandler { get; set; }
         public RpcServer() : base(new TinyIoCContainer())
         {
-            iocContainer.Register<IRpcDataSerializer2, HttpMultipartSerializer>(new HttpMultipartSerializer(), "default");
-            iocContainer.Register<IRpcDataSerializer, ProtoBufRpcDataSerializer>(new ProtoBufRpcDataSerializer(), "default");
+            iocContainer.Register<IRpcDataSerializer, HttpMultipartSerializer>(new HttpMultipartSerializer(), "default");
             iocContainer.Register<IRpcHeadSerializer, JsonRpcHeadSerializer>(new JsonRpcHeadSerializer(), "default");
             iocContainer.Register<IRpcServer>(this, "default");
             iocContainer.Register<IRpcServiceAdministration>(new RpcServiceAdministration());
@@ -185,7 +180,7 @@ namespace RpcOverHttp
                         var keyBytes = BitConverter.GetBytes(msg.handlerId);
                         mssend.Write(keyBytes, 0, keyBytes.Length);
                         this.FixupEventHandlerSender(msg);
-                        serializer.Serialize(mssend, msg.ArgumentTypes, msg.Arguments);
+                        serializer.Serialize(mssend, msg.ArgumentTypes, msg.Arguments, Enumerable.Range(0, msg.Arguments.Length).Select(x => x.ToString()).ToArray());
                         Console.WriteLine("rpc invoking client through websocket");
                         await webSocket.SendAsync(new ArraySegment<byte>(mssend.ToArray()), WebSocketMessageType.Binary, true, cancellationToken);
                     }
@@ -201,7 +196,7 @@ namespace RpcOverHttp
                         byte[] payloadData = receivedDataBuffer.Take(webSocketReceiveResult.Count).ToArray();
                         using (var msrecv = new MemoryStream(payloadData))
                         {
-                            object[] values = serializer.Deserialize(msrecv, new Type[] { result.GetType() });
+                            object[] values = serializer.Deserialize(msrecv, new Type[] { result.GetType() }, new string[] { "p0" });
                             msg.SetResult(values[0] as IRpcEventHandleResult);
                         }
                     }
@@ -366,6 +361,7 @@ namespace RpcOverHttp
                             if (itfMethod != null)
                             {
                                 var parmTypes = itfMethod.GetParameters().Select(x => x.ParameterType).ToArray();
+                                var pramNames = itfMethod.GetParameters().Select(x => x.Name).ToArray();
                                 bool error_generated = false;
                                 IRpcService rpcService = null;
 
@@ -382,7 +378,7 @@ namespace RpcOverHttp
                                 }
                                 try
                                 {
-                                    args = serializer.Deserialize(ctx.Request.InputStream, parmTypes);
+                                    args = serializer.Deserialize(ctx.Request.InputStream, parmTypes, pramNames);
 
                                 }
                                 catch (Exception ex)
@@ -543,7 +539,7 @@ namespace RpcOverHttp
                                                 {
                                                     if (itfMethod.ReturnType.IsGenericType)
                                                     {
-                                                        serializer.Serialize(outputStream, new Type[] { itfMethod.ReturnType.GenericTypeArguments[0] }, new object[] { returnVal });
+                                                        serializer.Serialize(outputStream, new Type[] { itfMethod.ReturnType.GenericTypeArguments[0] }, new object[] { returnVal }, new string[] { "p0" });
                                                     }
                                                     else
                                                     {
@@ -552,7 +548,7 @@ namespace RpcOverHttp
                                                 }
                                                 else
                                                 {
-                                                    serializer.Serialize(outputStream, new Type[] { itfMethod.ReturnType }, new object[] { returnVal });
+                                                    serializer.Serialize(outputStream, new Type[] { itfMethod.ReturnType }, new object[] { returnVal }, new string[] { "p0" });
                                                 }
                                                 IDisposable value = returnVal as IDisposable;
                                                 if (value != null)
