@@ -1,14 +1,6 @@
 ﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using ProtoBuf.Meta;
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace RpcOverHttp
 {
@@ -196,16 +188,30 @@ namespace RpcOverHttp
         }
         internal IRpcEventHandleResult WaitResult(int millisecondsTimeout)
         {
-            if (waitHandle.WaitOne(millisecondsTimeout))
+            var waits = 12;
+            if (millisecondsTimeout > 1000)
             {
-                Console.WriteLine("server is continue with a client feed.");
-                return this.Result;
+                waits = (int)Math.Ceiling(millisecondsTimeout / 1000.0);
             }
             else
             {
-                Console.WriteLine("server is failed to continue as wsrpc timeout.");
-                throw new TimeoutException(string.Format("rpc to client is timeout, subscription key is {0}.", handlerId));
+                waits = 1;
             }
+            while (waits > 0)
+            {
+                if (!waitHandle.WaitOne(1000))
+                {
+                    Console.WriteLine("a server thread is waiting client feed for handler {0}...", handlerId);
+                    waits--;
+                }
+                else
+                {
+                    Console.WriteLine("a client feed received.");
+                    return this.Result;
+                }
+            }
+            Console.WriteLine("server is failed to continue as wsrpc timeout.");
+            throw new TimeoutException(string.Format("rpc to client is timeout, subscription key is {0}.", handlerId));
         }
     }
 

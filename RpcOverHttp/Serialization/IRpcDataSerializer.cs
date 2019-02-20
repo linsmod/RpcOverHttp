@@ -31,6 +31,12 @@ namespace RpcOverHttp.Serialization
         }
     }
 
+    public interface IWsDataSerializer
+    {
+        void Serialize(Stream writeStream, Type[] types, object[] args, string[] names);
+        object[] Deserialize(Stream readStream, Type[] types, string[] names);
+    }
+
     /// <summary>
     /// 数据序列化接口，用于序列化和反序列化请求参数
     /// </summary>
@@ -43,9 +49,9 @@ namespace RpcOverHttp.Serialization
     /// <summary>
     /// IRpcDataSerializer的内置默认实现
     /// </summary>
-    public partial class ProtoBufRpcDataSerializer : IRpcDataSerializer
+    public partial class ProtoBufRpcDataSerializer : IRpcDataSerializer, IWsDataSerializer
     {
-        public object[] Deserialize(Stream readStream, Type[] types,string[] names)
+        public object[] Deserialize(Stream readStream, Type[] types, string[] names)
         {
             var reader = new BinaryReader(readStream);
             var argLenth = reader.ReadByte();

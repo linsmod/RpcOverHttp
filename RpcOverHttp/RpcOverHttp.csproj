@@ -98,6 +98,7 @@
     <Compile Include="RpcService.cs" />
     <Compile Include="SelfHost\SystemNetHttpContext.cs" />
     <Compile Include="SelfHost\SystemNetWebSocketContext.cs" />
+    <Compile Include="Serialization\CoreObject.cs" />
     <Compile Include="Serialization\HttpMultipartSerializer.cs" />
     <Compile Include="Serialization\IRpcDataSerializer.cs" />
     <Compile Include="Serialization\TempFileStream.cs" />

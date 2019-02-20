@@ -6,8 +6,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace RpcOverHttp
 {
@@ -112,12 +110,13 @@ namespace RpcOverHttp
         public static RpcClient Initialize(Uri url, string cerFilePath = null, WebProxy proxy = null)
         {
             var iocContainer = new TinyIoC.TinyIoCContainer();
+            iocContainer.Register<IWsDataSerializer, ProtoBufRpcDataSerializer>(new ProtoBufRpcDataSerializer(), "default");
             iocContainer.Register<IRpcDataSerializer, HttpMultipartSerializer>(new HttpMultipartSerializer(), "default");
             iocContainer.Register<IRpcHeadSerializer, JsonRpcHeadSerializer>(new JsonRpcHeadSerializer(), "default");
 
             var _proxyFactory = new RpcDynamicProxyFactory(url, proxy, iocContainer);
-            var websocketServer = ""; 
-             var client = new RpcClient(_proxyFactory, proxy, iocContainer);
+            var websocketServer = "";
+            var client = new RpcClient(_proxyFactory, proxy, iocContainer);
             if (!string.IsNullOrEmpty(cerFilePath))
             {
                 if (!System.IO.File.Exists(cerFilePath))

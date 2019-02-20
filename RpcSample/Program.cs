@@ -53,9 +53,9 @@ namespace RpcSample
                         client.ServerCertificateValidationCallback = (a, b, c, d) => true;
                         var sample = client.Rpc<IRpcServiceSample>();
 
-                        sample.SampleActionEventDiffThread += Sample_SampleActionEventDiffThread;
-                        sample.TestRemoteEventHandlerDiffThread();
-                        Thread.Sleep(-1);
+                        //sample.SampleActionEventDiffThread += Sample_SampleActionEventDiffThread;
+                        //sample.TestRemoteEventHandlerDiffThread();
+                        //Thread.Sleep(-1);
                         //remote event handler test
                         sample.SampleFuncEvent += Sample_SampleFuncEvent;
                         sample.SampleActionEvent += Sample_SampleActionEvent;

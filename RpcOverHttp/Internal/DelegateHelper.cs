@@ -1,16 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace RpcOverHttp.Internal
 {
     class DelegateHelper
     {
-        static Dictionary<Guid, Delegate> delegates = new Dictionary<Guid, Delegate>();
+        public class DelegateGroup : Dictionary<MethodInfo, Delegate>
+        {
+
+        }
+        static Dictionary<Guid, DelegateGroup> delegates = new Dictionary<Guid, DelegateGroup>();
         [MethodImpl(MethodImplOptions.Synchronized)]
         public static Delegate InstanceCombine(Delegate source, Delegate value)
         {
@@ -19,27 +20,39 @@ namespace RpcOverHttp.Internal
                 return Delegate.Combine(source, value);
             }
             Guid instanceId = RpcHead.Current.InstanceId;
-            Delegate fixedSource = null;
+            DelegateGroup group = null;
+
             if (!delegates.ContainsKey(instanceId))
+            {
+                group = new DelegateGroup();
+                delegates.Add(instanceId, group);
+            }
+            else
+            {
+                group = delegates[instanceId];
+            }
+
+            Delegate fixedSource = null;
+            if (!group.ContainsKey(value.Method))
             {
                 if (source != null)
                 {
-                    delegates.Add(instanceId, source);
+                    group.Add(value.Method, source);
                     fixedSource = source;
                 }
             }
             else
             {
-                fixedSource = delegates[instanceId];
+                fixedSource = group[value.Method];
             }
             var retVal = Delegate.Combine(fixedSource, value);
             if (retVal == null)
             {
-                delegates.Remove(instanceId);
+                group.Remove(value.Method);
             }
             else
             {
-                delegates[instanceId] = retVal;
+                group[value.Method] = retVal;
             }
             return retVal;
         }
@@ -52,27 +65,39 @@ namespace RpcOverHttp.Internal
                 return Delegate.Remove(source, value);
             }
             Guid instanceId = RpcHead.Current.InstanceId;
-            Delegate fixedSource = null;
+            DelegateGroup group = null;
+
             if (!delegates.ContainsKey(instanceId))
+            {
+                group = new DelegateGroup();
+                delegates.Add(instanceId, group);
+            }
+            else
+            {
+                group = delegates[instanceId];
+            }
+
+            Delegate fixedSource = null;
+            if (!group.ContainsKey(value.Method))
             {
                 if (source != null)
                 {
-                    delegates.Add(instanceId, source);
+                    group.Add(value.Method, source);
                     fixedSource = source;
                 }
             }
             else
             {
-                fixedSource = delegates[instanceId];
+                fixedSource = group[value.Method];
             }
             var retVal = Delegate.Remove(fixedSource, value);
             if (retVal == null)
             {
-                delegates.Remove(instanceId);
+                group.Remove(value.Method);
             }
             else
             {
-                delegates[instanceId] = retVal;
+                group[value.Method] = retVal;
             }
             return retVal;
         }

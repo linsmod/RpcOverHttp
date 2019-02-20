@@ -8,36 +8,43 @@ namespace RpcOverHttp.Serialization
 {
     class HttpMultipartSerializer : IRpcDataSerializer
     {
-        public void Serialize(Stream writeStream, Type[] types, object[] args, string[] names)
+        public void Serialize(Stream writeStream, Type[] types, object[] argValues, string[] names)
         {
+            if (!argValues.Any())
+                return;
             string boundary = "----RpcOverHttp" + DateTime.Now.Ticks.ToString("x");
             //request.ContentType = "multipart/form-data; boundary=" + boundary;
             //request.Method = "POST";
 
             using (var writer = new StreamWriter(writeStream, Encoding.UTF8))
             {
-                for (int i = 0; i < args.Length; i++)
+                for (int i = 0; i < argValues.Length; i++)
                 {
-                    var arg = args[i];
-                    if (arg == null)
+                    var type = types[i];
+                    var val = argValues[i];
+                    if (val == null)
                         continue;
                     writer.WriteLine("--" + boundary);
                     writer.WriteLine(string.Format("Content-Disposition: form-data; name=\"{0}\"", names[i]));
                     writer.WriteLine();
                     if (typeof(Stream).IsAssignableFrom(types[i]))
                     {
-                        (arg as Stream).CopyTo(writeStream);
+                        (val as Stream).CopyTo(writeStream);
                     }
                     else if (simpleTypes.Any(x => x == types[i]))
                     {
-                        writer.WriteLine(arg);
+                        writer.WriteLine(val);
                     }
-                    else if (types[i].IsClass && !types[i].IsAbstract && types[i].IsPublic)
+                    else if (typeof(IRpcEventHandleResult).IsAssignableFrom(type))
+                    {
+                        CoreObject.Serialize(writer.BaseStream, type, val, names[i]);
+                    }
+                    else if (types[i].IsClass && !types[i].IsAbstract)
                     {
                         var properties = types[i].GetProperties().Where(x => x.CanRead && x.CanWrite);
-                        SerializeInternal(writer,
+                        SerializeInternal(writer, boundary,
                             properties.Select(x => x.PropertyType).ToArray(),
-                            properties.Select(x => x.GetValue(args[i])).ToArray(),
+                            properties.Select(x => x.GetValue(argValues[i])).ToArray(),
                             properties.Select(x => x.Name).ToArray());
                     }
                     else
@@ -45,12 +52,11 @@ namespace RpcOverHttp.Serialization
                         throw new NotSupportedException(string.Format("parameter at {0} using type {1} is not supported by HttpMultipartSerializer", i, types[i]));
                     }
                 }
-                writer.WriteLine(boundary + "--");
+                writer.WriteLine("--" + boundary + "--");
             }
         }
-        void SerializeInternal(StreamWriter writer, Type[] types, object[] args, string[] names)
+        void SerializeInternal(StreamWriter writer, string boundary, Type[] types, object[] args, string[] names)
         {
-            string boundary = "----RpcOverHttp" + DateTime.Now.Ticks.ToString("x");
             //request.ContentType = "multipart/form-data; boundary=" + boundary;
             //request.Method = "POST";
 
@@ -75,12 +81,14 @@ namespace RpcOverHttp.Serialization
                     throw new NotSupportedException(string.Format("property \"{0}\" using type {1} is not supported by HttpMultipartSerializer", names[i], types[i]));
                 }
             }
-            writer.WriteLine(boundary + "--");
+            writer.WriteLine("--" + boundary + "--");
         }
 
         public object[] Deserialize(Stream readStream, Type[] types, string[] names)
         {
             var retVal = new object[types.Length];
+            if (!types.Any())
+                return retVal;
             var parser = new HttpMultipartParser.MultipartFormDataParser(readStream);
             for (int i = 0; i < types.Length; i++)
             {
@@ -110,7 +118,19 @@ namespace RpcOverHttp.Serialization
                         retVal[i] = (part as FilePart).Data;
                     }
                 }
-                else if (type.IsClass && type.IsPublic && !type.IsAbstract)
+                else if (typeof(IRpcEventHandleResult).IsAssignableFrom(type))
+                {
+                    var part = parser.BodyParts.FirstOrDefault(x => x.Name.Equals(names[i], StringComparison.OrdinalIgnoreCase));
+                    if (part == null)
+                    {
+                        retVal[i] = null;
+                    }
+                    else
+                    {
+                        retVal[i] = CoreObject.Deserialize(type, (part as FilePart).Data);
+                    }
+                }
+                else if (type.IsClass && !type.IsAbstract)
                 {
                     //class model
                     try

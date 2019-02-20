@@ -398,10 +398,10 @@ namespace RpcOverHttp
 
         private async Task InvokeThread(object state)
         {
-            IRpcDataSerializer serializer;
+            IWsDataSerializer serializer;
             if (!this.factory.iocContainer.TryResolve(out serializer))
             {
-                serializer = this.factory.iocContainer.Resolve<IRpcDataSerializer>("default");
+                serializer = this.factory.iocContainer.Resolve<IWsDataSerializer>("default");
             }
             var data = state as byte[];
             using (var inputms = new MemoryStream(data))

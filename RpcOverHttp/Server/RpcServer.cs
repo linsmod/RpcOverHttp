@@ -40,6 +40,7 @@ namespace RpcOverHttp
         public IAuthroizeHandler AuthroizeHandler { get; set; }
         public RpcServer() : base(new TinyIoCContainer())
         {
+            iocContainer.Register<IWsDataSerializer, ProtoBufRpcDataSerializer>(new ProtoBufRpcDataSerializer(), "default");
             iocContainer.Register<IRpcDataSerializer, HttpMultipartSerializer>(new HttpMultipartSerializer(), "default");
             iocContainer.Register<IRpcHeadSerializer, JsonRpcHeadSerializer>(new JsonRpcHeadSerializer(), "default");
             iocContainer.Register<IRpcServer>(this, "default");
@@ -126,10 +127,10 @@ namespace RpcOverHttp
                 eventMessages[instanceId] = messages = new BlockingQueue<RpcEvent>(cancellationToken);
             }
             Console.WriteLine("ws client connected, rpc service instance id is {0}.", instanceId);
-            IRpcDataSerializer serializer;
+            IWsDataSerializer serializer;
             if (!iocContainer.TryResolve(out serializer))
             {
-                serializer = iocContainer.Resolve<IRpcDataSerializer>("default");
+                serializer = iocContainer.Resolve<IWsDataSerializer>("default");
             }
             //检查WebSocket状态
             while (webSocket.State == WebSocketState.Open)
