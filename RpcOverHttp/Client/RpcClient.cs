@@ -112,6 +112,7 @@ namespace RpcOverHttp
         public static RpcClient Initialize(Uri url, string cerFilePath = null, WebProxy proxy = null)
         {
             var iocContainer = new TinyIoC.TinyIoCContainer();
+            iocContainer.Register<IRpcDataSerializer2, HttpMultipartSerializer>(new HttpMultipartSerializer(), "default");
             iocContainer.Register<IRpcDataSerializer, ProtoBufRpcDataSerializer>(new ProtoBufRpcDataSerializer(), "default");
             iocContainer.Register<IRpcHeadSerializer, JsonRpcHeadSerializer>(new JsonRpcHeadSerializer(), "default");
 

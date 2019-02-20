@@ -60,6 +60,15 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Auth\AllowAnonymousAttribute.cs" />
+    <Compile Include="Http\HttpMultipartParser\BinaryStreamStack.cs" />
+    <Compile Include="Http\HttpMultipartParser\FilePart.cs" />
+    <Compile Include="Http\HttpMultipartParser\MultipartFormDataParser.cs" />
+    <Compile Include="Http\HttpMultipartParser\MultipartParseException.cs" />
+    <Compile Include="Http\HttpMultipartParser\MultipartStreamPart.cs" />
+    <Compile Include="Http\HttpMultipartParser\ParameterPart.cs" />
+    <Compile Include="Http\HttpMultipartParser\RebufferableBinaryReader.cs" />
+    <Compile Include="Http\HttpMultipartParser\StreamingMultipartFormDataParser.cs" />
+    <Compile Include="Http\HttpMultipartParser\SubsequenceFinder.cs" />
     <Compile Include="IExceptionHandler.cs" />
     <Compile Include="Internal\ClientEventHandlerInfo.cs" />
     <Compile Include="Internal\DelegateHelper.cs" />
@@ -89,6 +98,7 @@
     <Compile Include="RpcService.cs" />
     <Compile Include="SelfHost\SystemNetHttpContext.cs" />
     <Compile Include="SelfHost\SystemNetWebSocketContext.cs" />
+    <Compile Include="Serialization\HttpMultipartSerializer.cs" />
     <Compile Include="Serialization\IRpcDataSerializer.cs" />
     <Compile Include="Serialization\TempFileStream.cs" />
     <Compile Include="Server\IRpcServiceAdministration.cs" />
@@ -119,7 +129,6 @@
     <None Include="package.nuspec" />
     <None Include="packages.config" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

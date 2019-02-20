@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using Newtonsoft.Json.Linq;
+using System;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace DotNetEventSubscriptionTest
 {
@@ -11,6 +8,19 @@ namespace DotNetEventSubscriptionTest
     {
         static void Main(string[] args)
         {
+            string v = "1";
+            var v1 = JToken.Parse(v).ToObject(typeof(string));
+            var v2 = JToken.Parse(v).ToObject(typeof(Int64));
+            var v3 = JToken.Parse(v).ToObject(typeof(Int32));
+            var v4 = JToken.Parse(v).ToObject(typeof(Int16));
+            var v5 = JToken.Parse(v).ToObject(typeof(UInt64));
+            var v6 = JToken.Parse(v).ToObject(typeof(UInt32));
+            var v7 = JToken.Parse(v).ToObject(typeof(UInt16));
+            var v8 = JToken.Parse(v).ToObject(typeof(Single));
+            var v9 = JToken.Parse(v).ToObject(typeof(Decimal));
+            var v0 = JToken.Parse(v).ToObject(typeof(Double));
+            var v11 = JToken.Parse(v).ToObject(typeof(Byte)); ;
+            var v22 = JToken.Parse(v).ToObject(typeof(SByte));
             var sender = new Sender();
             for (int i = 0; i < 5; i++)
             {

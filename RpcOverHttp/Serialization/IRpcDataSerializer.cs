@@ -2,11 +2,7 @@
 using Newtonsoft.Json.Linq;
 using ProtoBuf.Meta;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace RpcOverHttp.Serialization
 {
@@ -42,6 +38,12 @@ namespace RpcOverHttp.Serialization
     {
         void Serialize(Stream writeStream, Type[] types, object[] args);
         object[] Deserialize(Stream readStream, Type[] types);
+    }
+
+    public interface IRpcDataSerializer2 : IRpcDataSerializer
+    {
+        void Serialize(Stream writeStream, Type[] types, object[] args, string[] names);
+        object[] Deserialize(Stream readStream, Type[] types, string[] names);
     }
 
     /// <summary>

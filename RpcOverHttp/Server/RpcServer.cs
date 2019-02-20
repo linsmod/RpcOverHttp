@@ -44,6 +44,7 @@ namespace RpcOverHttp
         public IAuthroizeHandler AuthroizeHandler { get; set; }
         public RpcServer() : base(new TinyIoCContainer())
         {
+            iocContainer.Register<IRpcDataSerializer2, HttpMultipartSerializer>(new HttpMultipartSerializer(), "default");
             iocContainer.Register<IRpcDataSerializer, ProtoBufRpcDataSerializer>(new ProtoBufRpcDataSerializer(), "default");
             iocContainer.Register<IRpcHeadSerializer, JsonRpcHeadSerializer>(new JsonRpcHeadSerializer(), "default");
             iocContainer.Register<IRpcServer>(this, "default");
