@@ -7,38 +7,46 @@ namespace RpcOverHttp
     {
         public static void UnZip(string zipFile, string destination)
         {
-            ZipArchive archive = new ZipArchive(File.OpenRead(zipFile));
-            foreach (ZipArchiveEntry entry in archive.Entries)
+            using (var zipfs = File.OpenRead(zipFile))
             {
-                using (var stream = entry.Open())
+                using (ZipArchive archive = new ZipArchive(zipfs))
                 {
-                    var itemPath = Path.Combine(destination, entry.FullName);
-                    var itemDir = Path.GetDirectoryName(itemPath);
-                    if (!Directory.Exists(itemDir))
-                        Directory.CreateDirectory(itemDir);
-                    using (var fs = File.Create(itemPath))
+                    foreach (ZipArchiveEntry entry in archive.Entries)
                     {
-                        stream.CopyTo(fs);
+                        using (var stream = entry.Open())
+                        {
+                            var itemPath = Path.Combine(destination, entry.FullName);
+                            var itemDir = Path.GetDirectoryName(itemPath);
+                            if (!Directory.Exists(itemDir))
+                                Directory.CreateDirectory(itemDir);
+                            using (var fs = File.Create(itemPath))
+                            {
+                                stream.CopyTo(fs);
+                            }
+                        }
                     }
                 }
             }
         }
+
         public static void UnZip(Stream zipFileStream, string destination)
         {
-            ZipArchive archive = new ZipArchive(zipFileStream);
-            foreach (ZipArchiveEntry entry in archive.Entries)
+            using (ZipArchive archive = new ZipArchive(zipFileStream))
             {
-                using (var stream = entry.Open())
+                foreach (ZipArchiveEntry entry in archive.Entries)
                 {
-                    var itemPath = Path.Combine(destination, entry.FullName);
-                    var itemDir = Path.GetDirectoryName(itemPath);
-                    if (!Directory.Exists(itemDir))
-                        Directory.CreateDirectory(itemDir);
-                    if (!string.IsNullOrEmpty(entry.Name))
+                    using (var stream = entry.Open())
                     {
-                        using (var fs = File.Create(itemPath))
+                        var itemPath = Path.Combine(destination, entry.FullName);
+                        var itemDir = Path.GetDirectoryName(itemPath);
+                        if (!Directory.Exists(itemDir))
+                            Directory.CreateDirectory(itemDir);
+                        if (!string.IsNullOrEmpty(entry.Name))
                         {
-                            stream.CopyTo(fs);
+                            using (var fs = File.Create(itemPath))
+                            {
+                                stream.CopyTo(fs);
+                            }
                         }
                     }
                 }
